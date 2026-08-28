@@ -6,17 +6,17 @@ class UserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['id', 'username', 'role', 'nama_lengkap']
 
-class ProdiSerializer(serializers.ModelSerializer):
+class MajorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prodi
         fields = '__all__'
 
-class KelasSerializer(serializers.ModelSerializer):
+class ClassSerializer(serializers.ModelSerializer):
     class Meta:
         model = Kelas
         fields = '__all__'
 
-class TugasSerializer(serializers.ModelSerializer):
+class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tugas
         fields = '__all__'
