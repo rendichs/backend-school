@@ -3,8 +3,8 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import CustomUser, Prodi, Kelas, Tugas
-from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer
+from .models import CustomUser, Prodi, Kelas, Tugas, Materi
+from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
@@ -36,3 +36,7 @@ class CustomAuthToken(ObtainAuthToken):
             'user_id': user.pk,
             'nama_lengkap': user.nama_lengkap
         })
+
+class MaterialViewSet(viewsets.ModelViewSet):
+    queryset = Materi.objects.all()
+    serializer_class = MaterialSerializer
