@@ -15,7 +15,8 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         
-        # Baris ini yang memastikan superuser otomatis menjadi admin
+        # SISTEM OTOMATIS: Memaksa role menjadi admin 
+        # setiap kali perintah createsuperuser dijalankan
         extra_fields.setdefault('role', 'admin')
 
         return self.create_user(username, email, password, **extra_fields)
@@ -26,11 +27,11 @@ class CustomUser(AbstractUser):
         ('guru', 'Guru'),
         ('murid', 'Murid'),
     )
+    # Aturan dasar untuk pendaftar umum
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='murid')
     nama_lengkap = models.CharField(max_length=255, blank=True, null=True)
 
-    def __str__(self):
-        return f"{self.username} ({self.role})"
+    objects = CustomUserManager()
 
 # ==================== DATA MASTER ====================
 
