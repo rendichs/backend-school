@@ -140,3 +140,8 @@ AUTH_USER_MODEL = 'api.CustomUser'
 # Mengizinkan akses dari frontend React saat tahap pengembangan
 CORS_ALLOW_ALL_ORIGINS = True
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+}
