@@ -43,7 +43,12 @@ class Prodi(models.Model):
 
 class BiodataGuru(models.Model):
     # Relasi One-to-One: 1 akun user hanya punya 1 biodata guru
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'guru'})
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="biodata_guru",
+        limit_choices_to={"role": "guru"},
+    )
     nip = models.CharField(max_length=50, unique=True)
     jantina = models.CharField(max_length=15, choices=[('Lelaki', 'Lelaki'), ('Perempuan', 'Perempuan')])
     no_telefon = models.CharField(max_length=20, blank=True, null=True)
@@ -53,7 +58,12 @@ class BiodataGuru(models.Model):
         return self.nip
 
 class BiodataMurid(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'murid'})
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="biodata_murid",
+        limit_choices_to={"role": "murid"},
+    )
     nis = models.CharField(max_length=50, unique=True)
     prodi = models.ForeignKey(Prodi, on_delete=models.SET_NULL, null=True)
     jantina = models.CharField(max_length=15, choices=[('Lelaki', 'Lelaki'), ('Perempuan', 'Perempuan')])

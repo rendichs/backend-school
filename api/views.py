@@ -3,8 +3,9 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import CustomUser, Prodi, Kelas, Tugas, Materi
-from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer
+from .models import CustomUser, Prodi, Kelas, Tugas, Materi, BiodataGuru
+from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer, GuruSerializer
+from .permissions import IsAdminUserRole
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
@@ -40,3 +41,8 @@ class CustomAuthToken(ObtainAuthToken):
 class MaterialViewSet(viewsets.ModelViewSet):
     queryset = Materi.objects.all()
     serializer_class = MaterialSerializer
+
+class GuruViewSet(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.filter(role="guru")
+    serializer_class = GuruSerializer
+    permission_classes = [IsAdminUserRole]
