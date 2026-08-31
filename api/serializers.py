@@ -26,7 +26,7 @@ class MaterialSerializer(serializers.ModelSerializer):
         model = Materi
         fields = '__all__'
 
-class GuruSerializer(serializers.ModelSerializer):
+class TeacherSerializer(serializers.ModelSerializer):
     nip = serializers.CharField(source="biodata_guru.nip")
     jantina = serializers.CharField(source="biodata_guru.jantina")
     no_telefon = serializers.CharField(
