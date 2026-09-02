@@ -1,10 +1,10 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import CustomUser, Prodi, Kelas, Tugas, Materi, BiodataGuru
-from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer, TeacherSerializer
+from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer, TeacherSerializer, CustomAuthTokenSerializer
 from .permissions import IsAdminUserRole
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -25,24 +25,34 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = AssignmentSerializer
 
 class CustomAuthToken(ObtainAuthToken):
+    serializer_class = CustomAuthTokenSerializer
+
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer = self.serializer_class(
+            data=request.data,
+            context={"request": request},
+        )
+
         serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+
+        user = serializer.validated_data["user"]
+
         token, created = Token.objects.get_or_create(user=user)
-        
-        return Response({
-            'token': token.key,
-            'role': user.role, # Mengirim role ke frontend
-            'user_id': user.pk,
-            'nama_lengkap': user.nama_lengkap
-        })
+
+        return Response(
+            {
+                "token": token.key,
+                "role": user.role,
+                "user_id": user.pk,
+                "nama_lengkap": user.nama_lengkap,
+            }
+        )
 
 class MaterialViewSet(viewsets.ModelViewSet):
     queryset = Materi.objects.all()
     serializer_class = MaterialSerializer
 
 class TeacherViewSet(viewsets.ModelViewSet):
-    queryset = CustomUser.objects.filter(role="guru")
+    queryset = CustomUser.objects.filter(role="guru").select_related("biodata_guru")
     serializer_class = TeacherSerializer
     permission_classes = [IsAdminUserRole]

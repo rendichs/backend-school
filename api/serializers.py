@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import CustomUser, Prodi, Kelas, Tugas, Materi, BiodataGuru, BiodataMurid
+from django.contrib.auth import authenticate
+from rest_framework.authtoken.serializers import AuthTokenSerializer
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,14 +29,21 @@ class MaterialSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class TeacherSerializer(serializers.ModelSerializer):
-    nip = serializers.CharField(source="biodata_guru.nip")
-    jantina = serializers.CharField(source="biodata_guru.jantina")
+    nip = serializers.CharField(
+        source="biodata_guru.nip"
+    )
+
+    jantina = serializers.CharField(
+        source="biodata_guru.jantina"
+    )
+
     no_telefon = serializers.CharField(
         source="biodata_guru.no_telefon",
         required=False,
         allow_blank=True,
         allow_null=True,
     )
+
     alamat = serializers.CharField(
         source="biodata_guru.alamat",
         required=False,
@@ -50,7 +59,6 @@ class TeacherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-
         fields = [
             "id",
             "username",
@@ -65,24 +73,32 @@ class TeacherSerializer(serializers.ModelSerializer):
             "is_active",
         ]
 
-        read_only_fields = ["id", "role"]
+        read_only_fields = [
+            "id",
+            "role",
+        ]
 
     def create(self, validated_data):
-        biodata_data = validated_data.pop("biodata_guru")
-        password = validated_data.pop("password", None)
+        biodata_data = validated_data.pop(
+            "biodata_guru"
+        )
+
+        password = validated_data.pop(
+            "password",
+            None
+        )
+
+        if not password:
+            raise serializers.ValidationError({
+                "password": "Password wajib diisi."
+            })
 
         user = CustomUser(
             **validated_data,
             role="guru",
         )
 
-        if password:
-            user.set_password(password)
-        else:
-            raise serializers.ValidationError({
-                "password": "Password wajib diisi."
-            })
-
+        user.set_password(password)
         user.save()
 
         BiodataGuru.objects.create(
@@ -92,4 +108,65 @@ class TeacherSerializer(serializers.ModelSerializer):
 
         return user
 
-# (Anda bisa menambahkan serializer untuk Materi, Biodata, dan Absensi dengan pola yang sama)
+    def update(self, instance, validated_data):
+        biodata_data = validated_data.pop(
+            "biodata_guru",
+            {}
+        )
+
+        password = validated_data.pop(
+            "password",
+            None
+        )
+
+        # Update user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Update password jika diisi
+        if password:
+            instance.set_password(password)
+
+        instance.save()
+
+        # Update biodata
+        biodata = instance.biodata_guru
+
+        for attr, value in biodata_data.items():
+            setattr(biodata, attr, value)
+
+        biodata.save()
+
+        return instance
+
+class CustomAuthTokenSerializer(AuthTokenSerializer):
+    def validate(self, attrs):
+        username = attrs.get("username")
+        password = attrs.get("password")
+
+        user = authenticate(
+            request=self.context.get("request"),
+            username=username,
+            password=password,
+        )
+
+        if user:
+            attrs["user"] = user
+            return attrs
+
+        # Cek apakah akun ada tetapi sedang nonaktif
+        inactive_user = CustomUser.objects.filter(
+            username=username
+        ).first()
+
+        if inactive_user and not inactive_user.is_active:
+            raise serializers.ValidationError({
+                "detail": (
+                    "Akun Anda sedang dinonaktifkan. "
+                    "Silakan hubungi administrator!"
+                )
+            })
+
+        raise serializers.ValidationError({
+            "detail": "Username atau password salah."
+        })
