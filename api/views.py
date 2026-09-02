@@ -2,7 +2,17 @@ from rest_framework import viewsets, status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from .permissions import (
+    IsAdminUserRole,
+    IsTeacherUserRole,
+    IsStudentUserRole,
+    IsAdminOrTeacherRole,
+    IsAuthenticatedApplicationUser,
+    IsAdminOrReadOnly,
+    IsAdminOrTeacherWriteReadOnly,
+    IsTeacherOwnerOrAdmin,
+    IsStudentOwnerOrAdmin,
+)
 
 from .models import (
     CustomUser,
@@ -120,8 +130,16 @@ class SchoolViewSet(viewsets.ModelViewSet):
     serializer_class = SchoolSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
+
+    def destroy(self, request, *args, **kwargs):
+        return Response(
+            {
+                "detail": "School cannot be deleted."
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
 
 # ============================================================
@@ -156,9 +174,11 @@ class TeacherViewSet(viewsets.ModelViewSet):
 
             dependencies = {}
 
-            teaching_assignments = TeachingAssignment.objects.filter(
-                teacher=profile
-            ).count()
+            teaching_assignments = (
+                TeachingAssignment.objects
+                .filter(teacher=profile)
+                .count()
+            )
 
             if teaching_assignments > 0:
                 dependencies["teaching_assignments"] = (
@@ -202,7 +222,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -217,7 +237,7 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
     serializer_class = AcademicYearSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -228,7 +248,7 @@ class SemesterViewSet(viewsets.ModelViewSet):
     serializer_class = SemesterSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -239,7 +259,7 @@ class ProgramViewSet(viewsets.ModelViewSet):
     serializer_class = ProgramSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -250,7 +270,7 @@ class InterestClassViewSet(viewsets.ModelViewSet):
     serializer_class = InterestClassSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -261,7 +281,7 @@ class SchoolClassViewSet(viewsets.ModelViewSet):
     serializer_class = SchoolClassSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -272,7 +292,7 @@ class ClassMemberViewSet(viewsets.ModelViewSet):
     serializer_class = ClassMemberSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -287,7 +307,7 @@ class SubjectGroupViewSet(viewsets.ModelViewSet):
     serializer_class = SubjectGroupSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -298,7 +318,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     serializer_class = SubjectSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -319,7 +339,7 @@ class TeachingAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = TeachingAssignmentSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -334,7 +354,7 @@ class FileViewSet(viewsets.ModelViewSet):
     serializer_class = FileSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
@@ -345,7 +365,7 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
     serializer_class = MaterialFileSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherWriteReadOnly
     ]
 
 
@@ -401,7 +421,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = AssignmentSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherWriteReadOnly
     ]
 
 
@@ -426,7 +446,7 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
     serializer_class = AssignmentSubmissionSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAuthenticatedApplicationUser
     ]
 
 
@@ -479,7 +499,7 @@ class GradeViewSet(viewsets.ModelViewSet):
     serializer_class = GradeSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAuthenticatedApplicationUser
     ]
 
 
@@ -523,7 +543,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     serializer_class = ScheduleSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -540,7 +560,7 @@ class SchoolAttendanceSessionViewSet(
     serializer_class = SchoolAttendanceSessionSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
@@ -556,7 +576,7 @@ class SchoolAttendanceRecordViewSet(
     serializer_class = SchoolAttendanceRecordSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
@@ -575,7 +595,7 @@ class ClassAttendanceSessionViewSet(
     serializer_class = ClassAttendanceSessionSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
@@ -591,7 +611,7 @@ class ClassAttendanceRecordViewSet(
     serializer_class = ClassAttendanceRecordSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
@@ -608,7 +628,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     serializer_class = AnnouncementSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminOrTeacherRole
     ]
 
 
