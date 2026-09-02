@@ -3,9 +3,28 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import CustomUser, Prodi, Kelas, Tugas, Materi, BiodataGuru
-from .serializers import UserSerializer, MajorSerializer, ClassSerializer, AssignmentSerializer, MaterialSerializer, TeacherSerializer, CustomAuthTokenSerializer
+
+from .models import (
+    CustomUser,
+    Prodi,
+    Kelas,
+    Tugas,
+    Materi,
+    BiodataGuru,
+)
+
+from .serializers import (
+    UserSerializer,
+    MajorSerializer,
+    ClassSerializer,
+    AssignmentSerializer,
+    MaterialSerializer,
+    TeacherSerializer,
+    CustomAuthTokenSerializer,
+)
+
 from .permissions import IsAdminUserRole
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
@@ -53,6 +72,48 @@ class MaterialViewSet(viewsets.ModelViewSet):
     serializer_class = MaterialSerializer
 
 class TeacherViewSet(viewsets.ModelViewSet):
-    queryset = CustomUser.objects.filter(role="guru").select_related("biodata_guru")
+    queryset = (
+        CustomUser.objects
+        .filter(role="guru")
+        .select_related("biodata_guru")
+    )
+
     serializer_class = TeacherSerializer
     permission_classes = [IsAdminUserRole]
+
+    def destroy(self, request, *args, **kwargs):
+        teacher = self.get_object()
+
+        # ==================================================
+        # FIREWALL PENGHAPUSAN GURU
+        # ==================================================
+
+        # Cek apakah guru masih digunakan sebagai pengajar kelas
+        jumlah_kelas = Kelas.objects.filter(
+            guru=teacher
+        ).count()
+
+        if jumlah_kelas > 0:
+            return Response(
+                {
+                    "detail": (
+                        f"Guru {teacher.nama_lengkap} tidak dapat dihapus "
+                        f"karena masih digunakan pada {jumlah_kelas} kelas."
+                    ),
+                    "code": "teacher_in_use",
+                    "dependencies": {
+                        "kelas": jumlah_kelas,
+                    },
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # ==================================================
+        # JIKA AMAN → LANJUTKAN DELETE
+        # ==================================================
+
+        return super().destroy(
+            request,
+            *args,
+            **kwargs
+        )
