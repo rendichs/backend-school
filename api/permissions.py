@@ -985,3 +985,36 @@ class IsMessageMemberOrAdmin(BasePermission):
 
         return False
 
+class IsSettingAdminOrReadOnly(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsAdminActivityLog(BasePermission):
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role == "admin"
+
+class IsAdminAuditLog(BasePermission):
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role == "admin"

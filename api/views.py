@@ -42,6 +42,9 @@ from .permissions import (
     IsConversationMemberOrOwnerOrAdmin,
     IsConversationMemberManagerOrAdmin,
     IsMessageMemberOrAdmin,
+    IsSettingAdminOrReadOnly,
+    IsAdminActivityLog,
+    IsAdminAuditLog,
 )
 
 from .models import (
@@ -2805,35 +2808,60 @@ class MessageViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class SettingViewSet(viewsets.ModelViewSet):
-
     queryset = Setting.objects.all()
-
     serializer_class = SettingSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsSettingAdminOrReadOnly
     ]
 
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
 
-class ActivityLogViewSet(viewsets.ModelViewSet):
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can create settings."
+            )
 
-    queryset = ActivityLog.objects.all()
+        serializer.save()
 
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can update settings."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can delete settings."
+            )
+
+        instance.delete()
+
+
+class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ActivityLog.objects.select_related(
+        "user",
+    )
     serializer_class = ActivityLogSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsAdminActivityLog
     ]
 
 
-class AuditLogViewSet(viewsets.ModelViewSet):
-
-    queryset = AuditLog.objects.all()
-
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.select_related(
+        "user",
+    )
     serializer_class = AuditLogSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsAdminAuditLog
     ]
 
 
