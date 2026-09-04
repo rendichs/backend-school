@@ -196,3 +196,618 @@ class IsStudentOwnerOrAdmin(BasePermission):
             return student_profile.user == request.user
 
         return False
+
+class IsMaterialOwnerOrAdmin(BasePermission):
+    """
+    Admin:
+        - Full access
+
+    Teacher:
+        - Only access materials belonging to their teaching assignments
+
+    Student:
+        - Read only
+    """
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+
+class IsMaterialFileOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.material.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+
+class IsFileOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role in {
+            "admin",
+            "teacher",
+            "student",
+        }
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {"teacher", "student"}:
+            return obj.uploaded_by == request.user
+
+        return False
+
+
+class IsAssignmentOwnerOrAdmin(BasePermission):
+    """
+    Admin:
+        - Full access
+
+    Teacher:
+        - Only access assignments belonging to their teaching assignments
+
+    Student:
+        - Read only
+    """
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+
+class IsAssignmentFileOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.assignment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+
+class IsSubmissionOwnerOrTeacherOrAdmin(BasePermission):
+    """
+    Admin:
+        - Full access
+
+    Teacher:
+        - Access submissions for their own assignments
+
+    Student:
+        - Only access their own submissions
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role in {
+            "admin",
+            "teacher",
+            "student",
+        }
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.assignment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return (
+                obj.student.user
+                == request.user
+            )
+
+        return False
+
+class IsSubmissionAnswerOwnerOrTeacherOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role in {
+            "admin",
+            "teacher",
+            "student",
+        }
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.submission.assignment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return (
+                obj.submission.student.user
+                == request.user
+            )
+
+        return False
+
+class IsSubmissionFileOwnerOrTeacherOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.role in {
+            "admin",
+            "teacher",
+            "student",
+        }
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.submission.assignment
+                .teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            if request.method in self.SAFE_METHODS:
+                return (
+                    obj.submission.student.user
+                    == request.user
+                )
+
+            return (
+                obj.submission.student.user
+                == request.user
+            )
+
+        return False
+
+class IsGradeOwnerOrTeacherOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.assessment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return (
+                request.method in self.SAFE_METHODS
+                and obj.student.user == request.user
+            )
+
+        return False
+
+class IsAssignmentQuestionOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.assignment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsAssessmentOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsAssessmentItemOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.assessment.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsGradeComponentOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsReportCardOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {"teacher", "student"}:
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return request.method in self.SAFE_METHODS
+
+        if request.user.role == "student":
+            return (
+                request.method in self.SAFE_METHODS
+                and obj.student.user == request.user
+            )
+
+        return False
+
+class IsScheduleOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsClassAttendanceSessionOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.schedule.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsClassAttendanceRecordOwnerOrTeacherOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.session.schedule
+                .teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return (
+                request.method in self.SAFE_METHODS
+                and obj.student.user == request.user
+            )
+
+        return False
+
+class IsSchoolAttendanceSessionAdminOrTeacher(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role in {"admin", "teacher"}:
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role in {"admin", "teacher"}:
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False

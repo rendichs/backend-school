@@ -629,6 +629,7 @@ class FileSerializer(serializers.ModelSerializer):
 
         read_only_fields = [
             "id",
+            "uploaded_by",
             "uploaded_at",
         ]
 
@@ -728,6 +729,60 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
             "graded_at",
         ]
 
+    def validate(self, attrs):
+
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return attrs
+
+        role = request.user.role
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if role == "student":
+
+            forbidden_fields = {
+                "student",
+                "status",
+                "score",
+                "feedback",
+                "graded_at",
+            }
+
+            submitted_fields = (
+                forbidden_fields
+                & set(attrs.keys())
+            )
+
+            if submitted_fields:
+
+                field = sorted(submitted_fields)[0]
+
+                raise serializers.ValidationError({
+                    field: (
+                        f"Students cannot set '{field}'."
+                    )
+                })
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        elif role == "teacher":
+
+            if "student" in attrs:
+
+                raise serializers.ValidationError({
+                    "student": (
+                        "Teachers cannot change the submission student."
+                    )
+                })
+
+        return attrs
+
 
 class SubmissionAnswerSerializer(serializers.ModelSerializer):
 
@@ -782,6 +837,63 @@ class GradeSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate(self, attrs):
+
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return attrs
+
+        role = request.user.role
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if role == "student":
+            raise serializers.ValidationError(
+                "Students cannot create or modify grades."
+            )
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if role == "teacher":
+
+            if "student" in attrs:
+                student = attrs["student"]
+
+                assessment = attrs.get(
+                    "assessment",
+                    getattr(
+                        self.instance,
+                        "assessment",
+                        None,
+                    ),
+                )
+
+                if assessment:
+                    is_member = ClassMember.objects.filter(
+                        school_class=(
+                            assessment
+                            .teaching_assignment
+                            .school_class
+                        ),
+                        student=student,
+                        is_active=True,
+                    ).exists()
+
+                    if not is_member:
+                        raise serializers.ValidationError({
+                            "student": (
+                                "The student must belong "
+                                "to the assessment class."
+                            )
+                        })
+
+        return attrs
 
 
 class GradeComponentSerializer(serializers.ModelSerializer):

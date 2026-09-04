@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from .permissions import (
     IsAdminUserRole,
     IsTeacherUserRole,
@@ -12,6 +13,24 @@ from .permissions import (
     IsAdminOrTeacherWriteReadOnly,
     IsTeacherOwnerOrAdmin,
     IsStudentOwnerOrAdmin,
+    IsMaterialOwnerOrAdmin,
+    IsMaterialFileOwnerOrAdmin,
+    IsFileOwnerOrAdmin,
+    IsAssignmentOwnerOrAdmin,
+    IsAssignmentFileOwnerOrAdmin,
+    IsSubmissionOwnerOrTeacherOrAdmin,
+    IsSubmissionAnswerOwnerOrTeacherOrAdmin,
+    IsSubmissionFileOwnerOrTeacherOrAdmin,
+    IsGradeOwnerOrTeacherOrAdmin,
+    IsAssignmentQuestionOwnerOrAdmin,
+    IsAssessmentOwnerOrAdmin,
+    IsAssessmentItemOwnerOrAdmin,
+    IsGradeComponentOwnerOrAdmin,
+    IsReportCardOwnerOrAdmin,
+    IsScheduleOwnerOrAdmin,
+    IsClassAttendanceSessionOwnerOrAdmin,
+    IsClassAttendanceRecordOwnerOrTeacherOrAdmin,
+    IsSchoolAttendanceSessionAdminOrTeacher,
 )
 
 from .models import (
@@ -348,47 +367,389 @@ class TeachingAssignmentViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class FileViewSet(viewsets.ModelViewSet):
-
-    queryset = File.objects.all()
-
+    queryset = File.objects.select_related(
+        "uploaded_by",
+    )
     serializer_class = FileSerializer
+    permission_classes = [IsFileOwnerOrAdmin]
 
-    permission_classes = [
-        IsAdminOrTeacherRole
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role in {
+            "teacher",
+            "student",
+        }:
+            queryset = queryset.filter(
+                uploaded_by=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role not in {
+            "admin",
+            "teacher",
+            "student",
+        }:
+            raise PermissionDenied(
+                "You do not have permission to upload files."
+            )
+
+        serializer.save(
+            uploaded_by=self.request.user
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if instance.uploaded_by != self.request.user:
+            raise PermissionDenied(
+                "You can only manage your own files."
+            )
+
+        serializer.save(
+            uploaded_by=self.request.user
+        )
 
 
 class MaterialFileViewSet(viewsets.ModelViewSet):
-
-    queryset = MaterialFile.objects.all()
-
+    queryset = MaterialFile.objects.select_related(
+        "material",
+        "material__teaching_assignment",
+        "material__teaching_assignment__teacher",
+        "material__teaching_assignment__subject",
+        "material__teaching_assignment__school_class",
+        "file",
+    )
     serializer_class = MaterialFileSerializer
+    permission_classes = [IsMaterialFileOwnerOrAdmin]
 
-    permission_classes = [
-        IsAdminOrTeacherWriteReadOnly
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                material__teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        material = serializer.validated_data["material"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                material.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only attach files to your own materials."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to attach a file to this material."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.material.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage files for your own materials."
+                )
+
+            new_material = serializer.validated_data.get(
+                "material",
+                instance.material
+            )
+
+            if (
+                new_material.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move files to your own materials."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this material file."
+        )
 
 
 class AssignmentFileViewSet(viewsets.ModelViewSet):
-
-    queryset = AssignmentFile.objects.all()
-
+    queryset = AssignmentFile.objects.select_related(
+        "assignment",
+        "assignment__teaching_assignment",
+        "assignment__teaching_assignment__teacher",
+        "assignment__teaching_assignment__subject",
+        "assignment__teaching_assignment__school_class",
+        "file",
+    )
     serializer_class = AssignmentFileSerializer
+    permission_classes = [IsAssignmentFileOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                assignment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        assignment = serializer.validated_data["assignment"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only attach files to your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to attach a file to this assignment."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage files for your own assignments."
+                )
+
+            new_assignment = serializer.validated_data.get(
+                "assignment",
+                instance.assignment
+            )
+
+            if (
+                new_assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move files to your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this assignment file."
+        )
 
 
 class SubmissionFileViewSet(viewsets.ModelViewSet):
-
-    queryset = SubmissionFile.objects.all()
-
+    queryset = SubmissionFile.objects.select_related(
+        "submission",
+        "submission__assignment",
+        "submission__assignment__teaching_assignment",
+        "submission__assignment__teaching_assignment__teacher",
+        "submission__student",
+        "file",
+    )
     serializer_class = SubmissionFileSerializer
+    permission_classes = [IsSubmissionFileOwnerOrTeacherOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                submission__assignment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                submission__student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        submission = serializer.validated_data["submission"]
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                submission.assignment
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage files for submissions "
+                    "from your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+
+            if submission.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only upload files to your own submission."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to upload a submission file."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.submission.assignment
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage files for submissions "
+                    "from your own assignments."
+                )
+
+            new_submission = serializer.validated_data.get(
+                "submission",
+                instance.submission
+            )
+
+            if (
+                new_submission.assignment
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move files to your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+
+            if (
+                instance.submission.student.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage files from your own submission."
+                )
+
+            new_submission = serializer.validated_data.get(
+                "submission",
+                instance.submission
+            )
+
+            if new_submission.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only move files to your own submission."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this submission file."
+        )
 
 
 # ============================================================
@@ -398,14 +759,64 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
 class MaterialViewSet(viewsets.ModelViewSet):
 
     queryset = Material.objects.select_related(
-        "teaching_assignment"
+        "teaching_assignment",
+        "teaching_assignment__teacher",
+        "teaching_assignment__subject",
+        "teaching_assignment__school_class",
     )
 
     serializer_class = MaterialSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsMaterialOwnerOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+
+        teaching_assignment = (
+            serializer.validated_data["teaching_assignment"]
+        )
+
+        if self.request.user.role == "teacher":
+
+            if teaching_assignment.teacher.user != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied(
+                    "You can only create materials for your own teaching assignments."
+                )
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+
+        teaching_assignment = (
+            serializer.validated_data.get(
+                "teaching_assignment",
+                serializer.instance.teaching_assignment
+            )
+        )
+
+        if self.request.user.role == "teacher":
+
+            if teaching_assignment.teacher.user != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied(
+                    "You can only manage materials for your own teaching assignments."
+                )
+
+        serializer.save()
 
 
 # ============================================================
@@ -415,50 +826,410 @@ class MaterialViewSet(viewsets.ModelViewSet):
 class AssignmentViewSet(viewsets.ModelViewSet):
 
     queryset = Assignment.objects.select_related(
-        "teaching_assignment"
+        "teaching_assignment",
+        "teaching_assignment__teacher",
+        "teaching_assignment__subject",
+        "teaching_assignment__school_class",
     )
 
     serializer_class = AssignmentSerializer
 
     permission_classes = [
-        IsAdminOrTeacherWriteReadOnly
+        IsAssignmentOwnerOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+
+        teaching_assignment = (
+            serializer.validated_data["teaching_assignment"]
+        )
+
+        if self.request.user.role == "teacher":
+
+            if teaching_assignment.teacher.user != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied(
+                    "You can only create assignments for your own teaching assignments."
+                )
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+
+        teaching_assignment = (
+            serializer.validated_data.get(
+                "teaching_assignment",
+                serializer.instance.teaching_assignment
+            )
+        )
+
+        if self.request.user.role == "teacher":
+
+            if teaching_assignment.teacher.user != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied(
+                    "You can only manage assignments for your own teaching assignments."
+                )
+
+        serializer.save()
 
 
 class AssignmentQuestionViewSet(viewsets.ModelViewSet):
-
-    queryset = AssignmentQuestion.objects.all()
-
+    queryset = AssignmentQuestion.objects.select_related(
+        "assignment",
+        "assignment__teaching_assignment",
+        "assignment__teaching_assignment__teacher",
+        "assignment__teaching_assignment__subject",
+        "assignment__teaching_assignment__school_class",
+    )
     serializer_class = AssignmentQuestionSerializer
+    permission_classes = [IsAssignmentQuestionOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                assignment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        assignment = serializer.validated_data["assignment"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create questions for your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create an assignment question."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage questions for your own assignments."
+                )
+
+            new_assignment = serializer.validated_data.get(
+                "assignment",
+                instance.assignment
+            )
+
+            if (
+                new_assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move questions to your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update an assignment question."
+        )
 
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     queryset = AssignmentSubmission.objects.select_related(
         "assignment",
+        "assignment__teaching_assignment",
+        "assignment__teaching_assignment__teacher",
         "student",
     )
 
     serializer_class = AssignmentSubmissionSerializer
 
     permission_classes = [
-        IsAuthenticatedApplicationUser
+        IsSubmissionOwnerOrTeacherOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                assignment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+
+        from rest_framework.exceptions import PermissionDenied
+
+        assignment = serializer.validated_data["assignment"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot create student submissions."
+            )
+
+        if self.request.user.role == "student":
+
+            student = self.request.user.student_profile
+
+            is_member = ClassMember.objects.filter(
+                school_class=assignment.teaching_assignment.school_class,
+                student=student,
+                is_active=True,
+            ).exists()
+
+            if not is_member:
+                raise PermissionDenied(
+                    "You are not a member of the class for this assignment."
+                )
+
+            if not assignment.is_published:
+                raise PermissionDenied(
+                    "This assignment is not published."
+                )
+
+            serializer.save(
+                student=student
+            )
+
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create a submission."
+        )
+
+    def perform_update(self, serializer):
+
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage submissions for your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        if self.request.user.role == "student":
+
+            if instance.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only manage your own submission."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this submission."
+        )
 
 
 class SubmissionAnswerViewSet(viewsets.ModelViewSet):
-
-    queryset = SubmissionAnswer.objects.all()
-
+    queryset = SubmissionAnswer.objects.select_related(
+        "submission",
+        "submission__assignment",
+        "submission__assignment__teaching_assignment",
+        "submission__assignment__teaching_assignment__teacher",
+        "submission__student",
+        "question",
+        "question__assignment",
+    )
     serializer_class = SubmissionAnswerSerializer
+    permission_classes = [IsSubmissionAnswerOwnerOrTeacherOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                submission__assignment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                submission__student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        submission = serializer.validated_data["submission"]
+        question = serializer.validated_data["question"]
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                submission.assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage answers for your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+
+            if submission.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only answer your own submission."
+                )
+
+            if question.assignment_id != submission.assignment_id:
+                raise PermissionDenied(
+                    "This question does not belong to the submission assignment."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create an answer."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.submission.assignment
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage answers for your own assignments."
+                )
+
+            serializer.save()
+            return
+
+        if self.request.user.role == "student":
+
+            if (
+                instance.submission.student.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage your own answers."
+                )
+
+            new_submission = serializer.validated_data.get(
+                "submission",
+                instance.submission
+            )
+
+            new_question = serializer.validated_data.get(
+                "question",
+                instance.question
+            )
+
+            if new_submission.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only manage your own answers."
+                )
+
+            if (
+                new_question.assignment_id
+                != new_submission.assignment_id
+            ):
+                raise PermissionDenied(
+                    "The question must belong to the submission assignment."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this answer."
+        )
 
 
 # ============================================================
@@ -466,68 +1237,486 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class AssessmentViewSet(viewsets.ModelViewSet):
-
     queryset = Assessment.objects.select_related(
-        "teaching_assignment"
+        "teaching_assignment",
+        "teaching_assignment__teacher",
+        "teaching_assignment__subject",
+        "teaching_assignment__school_class",
     )
-
     serializer_class = AssessmentSerializer
+    permission_classes = [IsAssessmentOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        teaching_assignment = serializer.validated_data[
+            "teaching_assignment"
+        ]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create assessments "
+                    "for your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create an assessment."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage your own assessments."
+                )
+
+            new_teaching_assignment = serializer.validated_data.get(
+                "teaching_assignment",
+                instance.teaching_assignment
+            )
+
+            if (
+                new_teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move assessments "
+                    "to your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this assessment."
+        )
 
 
 class AssessmentItemViewSet(viewsets.ModelViewSet):
-
-    queryset = AssessmentItem.objects.all()
-
+    queryset = AssessmentItem.objects.select_related(
+        "assessment",
+        "assessment__teaching_assignment",
+        "assessment__teaching_assignment__teacher",
+        "assessment__teaching_assignment__subject",
+        "assessment__teaching_assignment__school_class",
+    )
     serializer_class = AssessmentItemSerializer
+    permission_classes = [IsAssessmentItemOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
 
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                assessment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        assessment = serializer.validated_data["assessment"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create assessment items "
+                    "for your own assessments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create an assessment item."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage items for your own assessments."
+                )
+
+            new_assessment = serializer.validated_data.get(
+                "assessment",
+                instance.assessment
+            )
+
+            if (
+                new_assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move items to your own assessments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this assessment item."
+        )
 
 class GradeViewSet(viewsets.ModelViewSet):
-
     queryset = Grade.objects.select_related(
         "assessment",
+        "assessment__teaching_assignment",
+        "assessment__teaching_assignment__teacher",
+        "assessment__teaching_assignment__subject",
+        "assessment__teaching_assignment__school_class",
         "student",
     )
-
     serializer_class = GradeSerializer
+    permission_classes = [IsGradeOwnerOrTeacherOrAdmin]
 
-    permission_classes = [
-        IsAuthenticatedApplicationUser
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                assessment__teaching_assignment__teacher__user=self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        assessment = serializer.validated_data["assessment"]
+        student = serializer.validated_data["student"]
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create grades "
+                    "for your own assessments."
+                )
+
+            is_member = ClassMember.objects.filter(
+                school_class=(
+                    assessment.teaching_assignment.school_class
+                ),
+                student=student,
+                is_active=True,
+            ).exists()
+
+            if not is_member:
+                raise PermissionDenied(
+                    "You can only grade students "
+                    "from the assessment class."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot create grades."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to create a grade."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage grades "
+                    "for your own assessments."
+                )
+
+            new_assessment = serializer.validated_data.get(
+                "assessment",
+                instance.assessment,
+            )
+
+            new_student = serializer.validated_data.get(
+                "student",
+                instance.student,
+            )
+
+            if (
+                new_assessment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move grades "
+                    "to your own assessments."
+                )
+
+            is_member = ClassMember.objects.filter(
+                school_class=(
+                    new_assessment.teaching_assignment.school_class
+                ),
+                student=new_student,
+                is_active=True,
+            ).exists()
+
+            if not is_member:
+                raise PermissionDenied(
+                    "The student must belong "
+                    "to the assessment class."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot modify grades."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to update this grade."
+        )
 
 
 class GradeComponentViewSet(viewsets.ModelViewSet):
-
-    queryset = GradeComponent.objects.all()
-
+    queryset = GradeComponent.objects.select_related(
+        "teaching_assignment",
+        "teaching_assignment__teacher",
+        "teaching_assignment__subject",
+        "teaching_assignment__school_class",
+    )
     serializer_class = GradeComponentSerializer
+    permission_classes = [IsGradeComponentOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        teaching_assignment = serializer.validated_data[
+            "teaching_assignment"
+        ]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create grade components "
+                    "for your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create a grade component."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage your own grade components."
+                )
+
+            new_teaching_assignment = serializer.validated_data.get(
+                "teaching_assignment",
+                instance.teaching_assignment
+            )
+
+            if (
+                new_teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move grade components "
+                    "to your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this grade component."
+        )
 
 
 class ReportCardViewSet(viewsets.ModelViewSet):
-
     queryset = ReportCard.objects.select_related(
         "student",
-        "school_class",
+        "student__user",
         "academic_year",
         "semester",
+        "school_class",
     )
-
     serializer_class = ReportCardSerializer
+    permission_classes = [IsReportCardOwnerOrAdmin]
 
-    permission_classes = [
-        IsAuthenticated
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "student":
+            queryset = queryset.filter(
+                student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can create report cards."
+            )
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can update report cards."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can delete report cards."
+            )
+
+        instance.delete()
 
 
 # ============================================================
@@ -535,16 +1724,117 @@ class ReportCardViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class ScheduleViewSet(viewsets.ModelViewSet):
-
     queryset = Schedule.objects.select_related(
-        "teaching_assignment"
+        "teaching_assignment",
+        "teaching_assignment__teacher",
+        "teaching_assignment__subject",
+        "teaching_assignment__school_class",
     )
-
     serializer_class = ScheduleSerializer
+    permission_classes = [IsScheduleOwnerOrAdmin]
 
-    permission_classes = [
-        IsAdminUserRole
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        teaching_assignment = serializer.validated_data[
+            "teaching_assignment"
+        ]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create schedules "
+                    "for your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create a schedule."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage your own schedules."
+                )
+
+            new_teaching_assignment = serializer.validated_data.get(
+                "teaching_assignment",
+                instance.teaching_assignment
+            )
+
+            if (
+                new_teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move schedules "
+                    "to your own teaching assignments."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update this schedule."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete your own schedules."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete this schedule."
+        )
 
 
 # ============================================================
@@ -560,7 +1850,7 @@ class SchoolAttendanceSessionViewSet(
     serializer_class = SchoolAttendanceSessionSerializer
 
     permission_classes = [
-        IsAdminOrTeacherRole
+        IsSchoolAttendanceSessionAdminOrTeacher
     ]
 
 
@@ -584,35 +1874,324 @@ class SchoolAttendanceRecordViewSet(
 # CLASS ATTENDANCE
 # ============================================================
 
-class ClassAttendanceSessionViewSet(
-    viewsets.ModelViewSet
-):
-
+class ClassAttendanceSessionViewSet(viewsets.ModelViewSet):
     queryset = ClassAttendanceSession.objects.select_related(
-        "schedule"
+        "schedule",
+        "schedule__teaching_assignment",
+        "schedule__teaching_assignment__teacher",
+        "schedule__teaching_assignment__subject",
+        "schedule__teaching_assignment__school_class",
     )
-
     serializer_class = ClassAttendanceSessionSerializer
+    permission_classes = [IsClassAttendanceSessionOwnerOrAdmin]
 
-    permission_classes = [
-        IsAdminOrTeacherRole
-    ]
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                schedule__teaching_assignment__teacher__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        schedule = serializer.validated_data["schedule"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                schedule.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only create attendance sessions "
+                    "for your own schedules."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create "
+            "a class attendance session."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.schedule.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage your own attendance sessions."
+                )
+
+            new_schedule = serializer.validated_data.get(
+                "schedule",
+                instance.schedule
+            )
+
+            if (
+                new_schedule.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move attendance sessions "
+                    "to your own schedules."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update "
+            "this attendance session."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.schedule.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete your own attendance sessions."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete "
+            "this attendance session."
+        )
 
 
-class ClassAttendanceRecordViewSet(
-    viewsets.ModelViewSet
-):
-
+class ClassAttendanceRecordViewSet(viewsets.ModelViewSet):
     queryset = ClassAttendanceRecord.objects.select_related(
         "session",
+        "session__schedule",
+        "session__schedule__teaching_assignment",
+        "session__schedule__teaching_assignment__teacher",
+        "session__schedule__teaching_assignment__subject",
+        "session__schedule__teaching_assignment__school_class",
         "student",
     )
-
     serializer_class = ClassAttendanceRecordSerializer
-
     permission_classes = [
-        IsAdminOrTeacherRole
+        IsClassAttendanceRecordOwnerOrTeacherOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                session__schedule__teaching_assignment__teacher__user=
+                self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        session = serializer.validated_data["session"]
+        student = serializer.validated_data["student"]
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                session.schedule
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage attendance "
+                    "for your own schedules."
+                )
+
+            is_member = ClassMember.objects.filter(
+                school_class=(
+                    session.schedule
+                    .teaching_assignment
+                    .school_class
+                ),
+                student=student,
+                is_active=True,
+            ).exists()
+
+            if not is_member:
+                raise PermissionDenied(
+                    "You can only record attendance "
+                    "for students in the scheduled class."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot create attendance records."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to create "
+            "an attendance record."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        # ====================================================
+        # ADMIN
+        # ====================================================
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # ====================================================
+        # TEACHER
+        # ====================================================
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.session.schedule
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only manage attendance "
+                    "for your own schedules."
+                )
+
+            new_session = serializer.validated_data.get(
+                "session",
+                instance.session
+            )
+
+            new_student = serializer.validated_data.get(
+                "student",
+                instance.student
+            )
+
+            if (
+                new_session.schedule
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only move attendance "
+                    "to your own schedules."
+                )
+
+            is_member = ClassMember.objects.filter(
+                school_class=(
+                    new_session.schedule
+                    .teaching_assignment
+                    .school_class
+                ),
+                student=new_student,
+                is_active=True,
+            ).exists()
+
+            if not is_member:
+                raise PermissionDenied(
+                    "The student must belong "
+                    "to the scheduled class."
+                )
+
+            serializer.save()
+            return
+
+        # ====================================================
+        # STUDENT
+        # ====================================================
+
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot modify attendance records."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to update "
+            "this attendance record."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+
+            if (
+                instance.session.schedule
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete attendance "
+                    "records for your own schedules."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete "
+            "this attendance record."
+        )
 
 
 # ============================================================
