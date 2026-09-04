@@ -645,6 +645,47 @@ class MaterialFileSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return attrs
+
+        if request.user.role == "admin":
+            return attrs
+
+        material = attrs.get(
+            "material",
+            getattr(self.instance, "material", None),
+        )
+
+        file_obj = attrs.get(
+            "file",
+            getattr(self.instance, "file", None),
+        )
+
+        if request.user.role == "teacher":
+            if (
+                material.teaching_assignment.teacher.user
+                != request.user
+            ):
+                raise serializers.ValidationError({
+                    "material": (
+                        "You can only manage files "
+                        "of your own materials."
+                    )
+                })
+
+            if file_obj.uploaded_by != request.user:
+                raise serializers.ValidationError({
+                    "file": (
+                        "You can only attach files "
+                        "uploaded by yourself."
+                    )
+                })
+
+        return attrs
+
 
 class AssignmentFileSerializer(serializers.ModelSerializer):
 
@@ -657,6 +698,47 @@ class AssignmentFileSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return attrs
+
+        if request.user.role == "admin":
+            return attrs
+
+        assignment = attrs.get(
+            "assignment",
+            getattr(self.instance, "assignment", None),
+        )
+
+        file_obj = attrs.get(
+            "file",
+            getattr(self.instance, "file", None),
+        )
+
+        if request.user.role == "teacher":
+            if (
+                assignment.teaching_assignment.teacher.user
+                != request.user
+            ):
+                raise serializers.ValidationError({
+                    "assignment": (
+                        "You can only manage files "
+                        "of your own assignments."
+                    )
+                })
+
+            if file_obj.uploaded_by != request.user:
+                raise serializers.ValidationError({
+                    "file": (
+                        "You can only attach files "
+                        "uploaded by yourself."
+                    )
+                })
+
+        return attrs
+
 
 class SubmissionFileSerializer(serializers.ModelSerializer):
 
@@ -668,6 +750,68 @@ class SubmissionFileSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
         ]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return attrs
+
+        if request.user.role == "admin":
+            return attrs
+
+        submission = attrs.get(
+            "submission",
+            getattr(self.instance, "submission", None),
+        )
+
+        file_obj = attrs.get(
+            "file",
+            getattr(self.instance, "file", None),
+        )
+
+        if request.user.role == "teacher":
+            if (
+                submission.assignment
+                .teaching_assignment.teacher.user
+                != request.user
+            ):
+                raise serializers.ValidationError({
+                    "submission": (
+                        "You can only manage files "
+                        "of your own assignments."
+                    )
+                })
+
+            if file_obj.uploaded_by != request.user:
+                raise serializers.ValidationError({
+                    "file": (
+                        "You can only attach files "
+                        "uploaded by yourself."
+                    )
+                })
+
+        elif request.user.role == "student":
+            if (
+                submission.student.user
+                != request.user
+            ):
+                raise serializers.ValidationError({
+                    "submission": (
+                        "You can only manage files "
+                        "of your own submission."
+                    )
+                })
+
+            if file_obj.uploaded_by != request.user:
+                raise serializers.ValidationError({
+                    "file": (
+                        "You can only attach files "
+                        "uploaded by yourself."
+                    )
+                })
+
+        return attrs
 
 
 # ============================================================

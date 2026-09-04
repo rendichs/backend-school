@@ -3,6 +3,10 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from rest_framework.decorators import action
+from django.db.models import Q
+
 from .permissions import (
     IsAdminUserRole,
     IsTeacherUserRole,
@@ -31,6 +35,13 @@ from .permissions import (
     IsClassAttendanceSessionOwnerOrAdmin,
     IsClassAttendanceRecordOwnerOrTeacherOrAdmin,
     IsSchoolAttendanceSessionAdminOrTeacher,
+    IsSchoolAttendanceSessionOwnerOrAdmin,
+    IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin,
+    IsNotificationOwnerOrAdmin,
+    IsAnnouncementOwnerOrAdmin,
+    IsConversationMemberOrOwnerOrAdmin,
+    IsConversationMemberManagerOrAdmin,
+    IsMessageMemberOrAdmin,
 )
 
 from .models import (
@@ -371,15 +382,14 @@ class FileViewSet(viewsets.ModelViewSet):
         "uploaded_by",
     )
     serializer_class = FileSerializer
-    permission_classes = [IsFileOwnerOrAdmin]
+    permission_classes = [
+        IsFileOwnerOrAdmin
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        if self.request.user.role in {
-            "teacher",
-            "student",
-        }:
+        if self.request.user.role != "admin":
             queryset = queryset.filter(
                 uploaded_by=self.request.user
             )
@@ -387,17 +397,6 @@ class FileViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
-        if self.request.user.role not in {
-            "admin",
-            "teacher",
-            "student",
-        }:
-            raise PermissionDenied(
-                "You do not have permission to upload files."
-            )
-
         serializer.save(
             uploaded_by=self.request.user
         )
@@ -405,20 +404,30 @@ class FileViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         from rest_framework.exceptions import PermissionDenied
 
-        instance = serializer.instance
-
         if self.request.user.role == "admin":
             serializer.save()
             return
 
-        if instance.uploaded_by != self.request.user:
+        if serializer.instance.uploaded_by != self.request.user:
             raise PermissionDenied(
                 "You can only manage your own files."
             )
 
-        serializer.save(
-            uploaded_by=self.request.user
-        )
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if instance.uploaded_by != self.request.user:
+            raise PermissionDenied(
+                "You can only delete your own files."
+            )
+
+        instance.delete()
 
 
 class MaterialFileViewSet(viewsets.ModelViewSet):
@@ -426,19 +435,21 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
         "material",
         "material__teaching_assignment",
         "material__teaching_assignment__teacher",
-        "material__teaching_assignment__subject",
-        "material__teaching_assignment__school_class",
         "file",
+        "file__uploaded_by",
     )
     serializer_class = MaterialFileSerializer
-    permission_classes = [IsMaterialFileOwnerOrAdmin]
+    permission_classes = [
+        IsMaterialFileOwnerOrAdmin
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
         if self.request.user.role == "teacher":
             queryset = queryset.filter(
-                material__teaching_assignment__teacher__user=self.request.user
+                material__teaching_assignment__teacher__user=
+                self.request.user
             )
 
         return queryset
@@ -453,7 +464,6 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-
             if (
                 material.teaching_assignment.teacher.user
                 != self.request.user
@@ -466,7 +476,7 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
             return
 
         raise PermissionDenied(
-            "You do not have permission to attach a file to this material."
+            "Students cannot create material files."
         )
 
     def perform_update(self, serializer):
@@ -479,18 +489,17 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-
             if (
                 instance.material.teaching_assignment.teacher.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage files for your own materials."
+                    "You can only manage files of your own materials."
                 )
 
             new_material = serializer.validated_data.get(
                 "material",
-                instance.material
+                instance.material,
             )
 
             if (
@@ -505,7 +514,30 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
             return
 
         raise PermissionDenied(
-            "You do not have permission to update this material file."
+            "Students cannot modify material files."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+            if (
+                instance.material.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete files of your own materials."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "Students cannot delete material files."
         )
 
 
@@ -514,19 +546,21 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
         "assignment",
         "assignment__teaching_assignment",
         "assignment__teaching_assignment__teacher",
-        "assignment__teaching_assignment__subject",
-        "assignment__teaching_assignment__school_class",
         "file",
+        "file__uploaded_by",
     )
     serializer_class = AssignmentFileSerializer
-    permission_classes = [IsAssignmentFileOwnerOrAdmin]
+    permission_classes = [
+        IsAssignmentFileOwnerOrAdmin
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
         if self.request.user.role == "teacher":
             queryset = queryset.filter(
-                assignment__teaching_assignment__teacher__user=self.request.user
+                assignment__teaching_assignment__teacher__user=
+                self.request.user
             )
 
         return queryset
@@ -541,7 +575,6 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-
             if (
                 assignment.teaching_assignment.teacher.user
                 != self.request.user
@@ -554,7 +587,7 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
             return
 
         raise PermissionDenied(
-            "You do not have permission to attach a file to this assignment."
+            "Students cannot create assignment files."
         )
 
     def perform_update(self, serializer):
@@ -567,18 +600,17 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-
             if (
                 instance.assignment.teaching_assignment.teacher.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage files for your own assignments."
+                    "You can only manage files of your own assignments."
                 )
 
             new_assignment = serializer.validated_data.get(
                 "assignment",
-                instance.assignment
+                instance.assignment,
             )
 
             if (
@@ -593,7 +625,30 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
             return
 
         raise PermissionDenied(
-            "You do not have permission to update this assignment file."
+            "Students cannot modify assignment files."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+            if (
+                instance.assignment.teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete files of your own assignments."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "Students cannot delete assignment files."
         )
 
 
@@ -604,17 +659,23 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
         "submission__assignment__teaching_assignment",
         "submission__assignment__teaching_assignment__teacher",
         "submission__student",
+        "submission__student__user",
         "file",
+        "file__uploaded_by",
     )
     serializer_class = SubmissionFileSerializer
-    permission_classes = [IsSubmissionFileOwnerOrTeacherOrAdmin]
+    permission_classes = [
+        IsSubmissionFileOwnerOrTeacherOrAdmin
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
         if self.request.user.role == "teacher":
             queryset = queryset.filter(
-                submission__assignment__teaching_assignment__teacher__user=self.request.user
+                submission__assignment
+                __teaching_assignment
+                __teacher__user=self.request.user
             )
 
         elif self.request.user.role == "student":
@@ -629,40 +690,31 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
 
         submission = serializer.validated_data["submission"]
 
-        # ====================================================
-        # ADMIN
-        # ====================================================
-
         if self.request.user.role == "admin":
-            serializer.save()
+            serializer.save(
+                file__uploaded_by=self.request.user
+            )
             return
 
-        # ====================================================
-        # TEACHER
-        # ====================================================
-
         if self.request.user.role == "teacher":
-
             if (
                 submission.assignment
                 .teaching_assignment.teacher.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage files for submissions "
-                    "from your own assignments."
+                    "You can only manage files of submissions "
+                    "for your own assignments."
                 )
 
             serializer.save()
             return
 
-        # ====================================================
-        # STUDENT
-        # ====================================================
-
         if self.request.user.role == "student":
-
-            if submission.student.user != self.request.user:
+            if (
+                submission.student.user
+                != self.request.user
+            ):
                 raise PermissionDenied(
                     "You can only upload files to your own submission."
                 )
@@ -671,7 +723,7 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
             return
 
         raise PermissionDenied(
-            "You do not have permission to upload a submission file."
+            "You do not have permission to create a submission file."
         )
 
     def perform_update(self, serializer):
@@ -679,67 +731,41 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
 
         instance = serializer.instance
 
-        # ====================================================
-        # ADMIN
-        # ====================================================
-
         if self.request.user.role == "admin":
             serializer.save()
             return
 
-        # ====================================================
-        # TEACHER
-        # ====================================================
-
         if self.request.user.role == "teacher":
-
             if (
                 instance.submission.assignment
                 .teaching_assignment.teacher.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage files for submissions "
-                    "from your own assignments."
-                )
-
-            new_submission = serializer.validated_data.get(
-                "submission",
-                instance.submission
-            )
-
-            if (
-                new_submission.assignment
-                .teaching_assignment.teacher.user
-                != self.request.user
-            ):
-                raise PermissionDenied(
-                    "You can only move files to your own assignments."
+                    "You can only manage files of your own assignments."
                 )
 
             serializer.save()
             return
 
-        # ====================================================
-        # STUDENT
-        # ====================================================
-
         if self.request.user.role == "student":
-
             if (
                 instance.submission.student.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage files from your own submission."
+                    "You can only manage your own submission files."
                 )
 
             new_submission = serializer.validated_data.get(
                 "submission",
-                instance.submission
+                instance.submission,
             )
 
-            if new_submission.student.user != self.request.user:
+            if (
+                new_submission.student.user
+                != self.request.user
+            ):
                 raise PermissionDenied(
                     "You can only move files to your own submission."
                 )
@@ -749,6 +775,42 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
 
         raise PermissionDenied(
             "You do not have permission to update this submission file."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+            if (
+                instance.submission.assignment
+                .teaching_assignment.teacher.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete files of your own assignments."
+                )
+
+            instance.delete()
+            return
+
+        if self.request.user.role == "student":
+            if (
+                instance.submission.student.user
+                != self.request.user
+            ):
+                raise PermissionDenied(
+                    "You can only delete your own submission files."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete this submission file."
         )
 
 
@@ -1845,13 +1907,51 @@ class SchoolAttendanceSessionViewSet(
     viewsets.ModelViewSet
 ):
 
-    queryset = SchoolAttendanceSession.objects.all()
+    queryset = SchoolAttendanceSession.objects.select_related(
+        "school",
+    )
 
     serializer_class = SchoolAttendanceSessionSerializer
 
     permission_classes = [
-        IsSchoolAttendanceSessionAdminOrTeacher
+        IsSchoolAttendanceSessionOwnerOrAdmin
     ]
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role in {"admin", "teacher"}:
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create "
+            "a school attendance session."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role in {"admin", "teacher"}:
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update "
+            "a school attendance session."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role in {"admin", "teacher"}:
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete "
+            "a school attendance session."
+        )
 
 
 class SchoolAttendanceRecordViewSet(
@@ -1860,14 +1960,130 @@ class SchoolAttendanceRecordViewSet(
 
     queryset = SchoolAttendanceRecord.objects.select_related(
         "session",
+        "session__school",
         "student",
+        "student__user",
     )
 
     serializer_class = SchoolAttendanceRecordSerializer
 
     permission_classes = [
-        IsAdminOrTeacherRole
+        IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "student":
+            queryset = queryset.filter(
+                student__user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        session = serializer.validated_data["session"]
+        student = serializer.validated_data["student"]
+
+        # ADMIN
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # TEACHER
+        if self.request.user.role == "teacher":
+
+            teacher_profile = getattr(
+                self.request.user,
+                "teacher_profile",
+                None,
+            )
+
+            if teacher_profile is None:
+                raise PermissionDenied(
+                    "Teacher profile not found."
+                )
+
+            if student.school_id != session.school_id:
+                raise PermissionDenied(
+                    "Student does not belong to "
+                    "the attendance school."
+                )
+
+            serializer.save()
+            return
+
+        # STUDENT
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot create school attendance records."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to create "
+            "a school attendance record."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        # ADMIN
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        # TEACHER
+        if self.request.user.role == "teacher":
+
+            session = serializer.validated_data.get(
+                "session",
+                instance.session,
+            )
+
+            student = serializer.validated_data.get(
+                "student",
+                instance.student,
+            )
+
+            if student.school_id != session.school_id:
+                raise PermissionDenied(
+                    "Student does not belong to "
+                    "the attendance school."
+                )
+
+            serializer.save()
+            return
+
+        # STUDENT
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot modify "
+                "school attendance records."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to update "
+            "this attendance record."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role in {
+            "admin",
+            "teacher",
+        }:
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete "
+            "this attendance record."
+        )
 
 
 # ============================================================
@@ -2199,16 +2415,97 @@ class ClassAttendanceRecordViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
-
     queryset = Announcement.objects.select_related(
-        "created_by"
+        "created_by",
     )
-
     serializer_class = AnnouncementSerializer
-
     permission_classes = [
-        IsAdminOrTeacherRole
+        IsAnnouncementOwnerOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                created_by=self.request.user
+            )
+
+        elif self.request.user.role == "student":
+            queryset = queryset.filter(
+                target__in=[
+                    "public",
+                    "student",
+                    "all",
+                ],
+                is_published=True,
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            serializer.save(
+                created_by=self.request.user
+            )
+            return
+
+        if self.request.user.role == "teacher":
+            serializer.save(
+                created_by=self.request.user
+            )
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to create "
+            "an announcement."
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if self.request.user.role == "teacher":
+            if instance.created_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only manage your own announcements."
+                )
+
+            serializer.save()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to update "
+            "this announcement."
+        )
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+            if instance.created_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only delete your own announcements."
+                )
+
+            instance.delete()
+            return
+
+        raise PermissionDenied(
+            "You do not have permission to delete "
+            "this announcement."
+        )
 
 
 # ============================================================
@@ -2216,16 +2513,87 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class NotificationViewSet(viewsets.ModelViewSet):
-
     queryset = Notification.objects.select_related(
-        "user"
+        "user",
     )
-
     serializer_class = NotificationSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsNotificationOwnerOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role in {
+            "teacher",
+            "student",
+        }:
+            queryset = queryset.filter(
+                user=self.request.user
+            )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only administrators can create notifications."
+            )
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Users cannot directly update notifications."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Users cannot delete notifications."
+            )
+
+        instance.delete()
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="mark-read",
+    )
+    def mark_read(self, request, pk=None):
+        notification = self.get_object()
+
+        if request.user.role != "admin":
+            if notification.user != request.user:
+                raise PermissionDenied(
+                    "You can only mark your own notifications as read."
+                )
+
+        if not notification.is_read:
+            notification.is_read = True
+            notification.read_at = timezone.now()
+            notification.save(
+                update_fields=[
+                    "is_read",
+                    "read_at",
+                ]
+            )
+
+        return Response(
+            {
+                "detail": "Notification marked as read."
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # ============================================================
@@ -2233,44 +2601,203 @@ class NotificationViewSet(viewsets.ModelViewSet):
 # ============================================================
 
 class ConversationViewSet(viewsets.ModelViewSet):
-
-    queryset = Conversation.objects.all()
-
+    queryset = Conversation.objects.select_related(
+        "created_by",
+    ).prefetch_related(
+        "members__user",
+    )
     serializer_class = ConversationSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsConversationMemberOrOwnerOrAdmin
     ]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
 
-class ConversationMemberViewSet(
-    viewsets.ModelViewSet
-):
+        if self.request.user.role != "admin":
+            queryset = queryset.filter(
+                Q(created_by=self.request.user)
+                | Q(members__user=self.request.user)
+            ).distinct()
 
+        return queryset
+
+    def perform_create(self, serializer):
+        conversation = serializer.save(
+            created_by=self.request.user
+        )
+
+        ConversationMember.objects.get_or_create(
+            conversation=conversation,
+            user=self.request.user,
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if instance.created_by != self.request.user:
+            raise PermissionDenied(
+                "Only the conversation creator can update "
+                "this conversation."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if instance.created_by != self.request.user:
+            raise PermissionDenied(
+                "Only the conversation creator can delete "
+                "this conversation."
+            )
+
+        instance.delete()
+
+
+class ConversationMemberViewSet(viewsets.ModelViewSet):
     queryset = ConversationMember.objects.select_related(
         "conversation",
+        "conversation__created_by",
         "user",
     )
-
     serializer_class = ConversationMemberSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsConversationMemberManagerOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role != "admin":
+            queryset = queryset.filter(
+                Q(conversation__created_by=self.request.user)
+                | Q(user=self.request.user)
+            ).distinct()
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        conversation = serializer.validated_data["conversation"]
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if conversation.created_by != self.request.user:
+            raise PermissionDenied(
+                "Only the conversation creator can add members."
+            )
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+
+        if self.request.user.role == "admin":
+            serializer.save()
+            return
+
+        if instance.conversation.created_by != self.request.user:
+            raise PermissionDenied(
+                "Only the conversation creator can update members."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if instance.conversation.created_by != self.request.user:
+            raise PermissionDenied(
+                "Only the conversation creator can remove members."
+            )
+
+        instance.delete()
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-
     queryset = Message.objects.select_related(
         "conversation",
         "sender",
     )
-
     serializer_class = MessageSerializer
-
     permission_classes = [
-        IsAuthenticated
+        IsMessageMemberOrAdmin
     ]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.role != "admin":
+            queryset = queryset.filter(
+                conversation__members__user=self.request.user
+            ).distinct()
+
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        conversation = serializer.validated_data["conversation"]
+
+        if self.request.user.role == "admin":
+            serializer.save(
+                sender=self.request.user
+            )
+            return
+
+        is_member = conversation.members.filter(
+            user=self.request.user
+        ).exists()
+
+        if not is_member:
+            raise PermissionDenied(
+                "You must be a member of the conversation "
+                "to send a message."
+            )
+
+        serializer.save(
+            sender=self.request.user
+        )
+
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Messages cannot be modified."
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Messages cannot be deleted."
+            )
+
+        instance.delete()
 
 
 # ============================================================
@@ -2345,3 +2872,4 @@ class CustomAuthToken(ObtainAuthToken):
                 "full_name": user.full_name,
             }
         )
+

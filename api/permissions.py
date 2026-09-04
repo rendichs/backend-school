@@ -275,6 +275,21 @@ class IsMaterialFileOwnerOrAdmin(BasePermission):
 
         return False
 
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.material.teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
 
 class IsFileOwnerOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -283,11 +298,22 @@ class IsFileOwnerOrAdmin(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        return request.user.role in {
-            "admin",
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
             "teacher",
             "student",
-        }
+        }:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        return obj.uploaded_by == request.user
 
     def has_object_permission(self, request, view, obj):
         if request.user.role == "admin":
@@ -474,12 +500,6 @@ class IsSubmissionFileOwnerOrTeacherOrAdmin(BasePermission):
             )
 
         if request.user.role == "student":
-            if request.method in self.SAFE_METHODS:
-                return (
-                    obj.submission.student.user
-                    == request.user
-                )
-
             return (
                 obj.submission.student.user
                 == request.user
@@ -751,34 +771,27 @@ class IsClassAttendanceSessionOwnerOrAdmin(BasePermission):
 
         return False
 
-class IsClassAttendanceRecordOwnerOrTeacherOrAdmin(BasePermission):
+class IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin(
+    BasePermission
+):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if request.user.role == "admin":
-            return True
-
-        if request.user.role == "teacher":
-            return True
-
-        if request.user.role == "student":
-            return request.method in self.SAFE_METHODS
-
-        return False
+        return request.user.role in {
+            "admin",
+            "teacher",
+            "student",
+        }
 
     def has_object_permission(self, request, view, obj):
         if request.user.role == "admin":
             return True
 
         if request.user.role == "teacher":
-            return (
-                obj.session.schedule
-                .teaching_assignment.teacher.user
-                == request.user
-            )
+            return True
 
         if request.user.role == "student":
             return (
@@ -788,7 +801,7 @@ class IsClassAttendanceRecordOwnerOrTeacherOrAdmin(BasePermission):
 
         return False
 
-class IsSchoolAttendanceSessionAdminOrTeacher(BasePermission):
+class IsSchoolAttendanceSessionOwnerOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
     def has_permission(self, request, view):
@@ -811,3 +824,164 @@ class IsSchoolAttendanceSessionAdminOrTeacher(BasePermission):
             return request.method in self.SAFE_METHODS
 
         return False
+
+class IsAnnouncementOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.created_by == request.user
+            )
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+class IsNotificationOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return (
+                obj.user == request.user
+            )
+
+        return False
+
+class IsConversationMemberOrOwnerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if obj.created_by == request.user:
+            return True
+
+        if request.method in self.SAFE_METHODS:
+            return obj.members.filter(
+                user=request.user
+            ).exists()
+
+        return False
+
+class IsConversationMemberManagerOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if obj.conversation.created_by == request.user:
+            return True
+
+        if request.method in self.SAFE_METHODS:
+            return obj.user == request.user
+
+        return False
+
+class IsMessageMemberOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role in {
+            "teacher",
+            "student",
+        }:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        is_member = obj.conversation.members.filter(
+            user=request.user
+        ).exists()
+
+        if not is_member:
+            return False
+
+        if request.method in self.SAFE_METHODS:
+            return True
+
+        return False
+
