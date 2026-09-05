@@ -1084,54 +1084,54 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
 
-        if self.request.user.role == "admin":
-            raise PermissionDenied(
-                "Administrators cannot modify assignment submissions."
-            )
-
-        if self.request.user.role == "teacher":
-            raise PermissionDenied(
-                "Teachers cannot modify assignment submissions."
-            )
-
-        if self.request.user.role == "student":
-
-            instance = serializer.instance
-
-            if instance.student.user != self.request.user:
-                raise PermissionDenied(
-                    "You can only modify your own submission."
-                )
-
-            new_student = serializer.validated_data.get(
-                "student",
-                instance.student,
-            )
-
-            if new_student.user != self.request.user:
-                raise PermissionDenied(
-                    "You cannot change the owner of a submission."
-                )
-
-            new_assignment = serializer.validated_data.get(
-                "assignment",
-                instance.assignment,
-            )
-
-            if new_assignment != instance.assignment:
-                raise PermissionDenied(
-                    "You cannot change the assignment of a submission."
-                )
-
-            serializer.save(
-                student=instance.student,
-                assignment=instance.assignment,
-            )
-            return
-
+    if self.request.user.role == "admin":
         raise PermissionDenied(
-            "You do not have permission to update an assignment submission."
+            "Administrators cannot modify assignment submissions."
         )
+
+    if self.request.user.role == "teacher":
+        raise PermissionDenied(
+            "Teachers cannot modify assignment submissions."
+        )
+
+    if self.request.user.role == "student":
+
+        instance = serializer.instance
+
+        if instance.student.user != self.request.user:
+            raise PermissionDenied(
+                "You can only modify your own submission."
+            )
+
+        new_student = serializer.validated_data.get(
+            "student",
+            instance.student,
+        )
+
+        if new_student.user != self.request.user:
+            raise PermissionDenied(
+                "You cannot change the owner of a submission."
+            )
+
+        new_assignment = serializer.validated_data.get(
+            "assignment",
+            instance.assignment,
+        )
+
+        if new_assignment != instance.assignment:
+            raise PermissionDenied(
+                "You cannot change the assignment of a submission."
+            )
+
+        serializer.save(
+            student=instance.student,
+            assignment=instance.assignment,
+        )
+        return
+
+    raise PermissionDenied(
+        "You do not have permission to update an assignment submission."
+    )
 
     def perform_destroy(self, instance):
 
@@ -1197,6 +1197,13 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
                     "You can only create answers for your own submission."
                 )
 
+            question = serializer.validated_data["question"]
+
+            if question.assignment != submission.assignment:
+                raise PermissionDenied(
+                    "The question must belong to the submission assignment."
+                )
+
             serializer.save()
             return
 
@@ -1228,9 +1235,11 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
 
         if self.request.user.role == "student":
 
+            instance = serializer.instance
+
             if instance.submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only modify your own submission answers."
+                    "You can only modify answers in your own submission."
                 )
 
             new_submission = serializer.validated_data.get(
@@ -1240,10 +1249,23 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
 
             if new_submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only move answers to your own submission."
+                    "You cannot change the submission owner."
                 )
 
-            serializer.save()
+            new_question = serializer.validated_data.get(
+                "question",
+                instance.question,
+            )
+
+            if new_question.assignment != new_submission.assignment:
+                raise PermissionDenied(
+                    "The question must belong to the submission assignment."
+                )
+
+            serializer.save(
+                submission=instance.submission,
+                question=new_question,
+            )
             return
 
         raise PermissionDenied(
