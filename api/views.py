@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 
 from .permissions import (
@@ -405,8 +406,6 @@ class FileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             serializer.save()
             return
@@ -419,8 +418,6 @@ class FileViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -458,8 +455,6 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         material = serializer.validated_data["material"]
 
         if self.request.user.role == "admin":
@@ -483,8 +478,6 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -521,8 +514,6 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -569,8 +560,6 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         assignment = serializer.validated_data["assignment"]
 
         if self.request.user.role == "admin":
@@ -594,8 +583,6 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -632,8 +619,6 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -676,9 +661,7 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
 
         if self.request.user.role == "teacher":
             queryset = queryset.filter(
-                submission__assignment
-                __teaching_assignment
-                __teacher__user=self.request.user
+                submission__assignment__teaching_assignment__teacher__user=self.request.user
             )
 
         elif self.request.user.role == "student":
@@ -689,8 +672,6 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         submission = serializer.validated_data["submission"]
 
         if self.request.user.role == "admin":
@@ -730,8 +711,6 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -781,8 +760,6 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -855,8 +832,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
         if self.request.user.role == "teacher":
 
             if teaching_assignment.teacher.user != self.request.user:
-                from rest_framework.exceptions import PermissionDenied
-
+    
                 raise PermissionDenied(
                     "You can only create materials for your own teaching assignments."
                 )
@@ -875,8 +851,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
         if self.request.user.role == "teacher":
 
             if teaching_assignment.teacher.user != self.request.user:
-                from rest_framework.exceptions import PermissionDenied
-
+    
                 raise PermissionDenied(
                     "You can only manage materials for your own teaching assignments."
                 )
@@ -922,8 +897,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if self.request.user.role == "teacher":
 
             if teaching_assignment.teacher.user != self.request.user:
-                from rest_framework.exceptions import PermissionDenied
-
+    
                 raise PermissionDenied(
                     "You can only create assignments for your own teaching assignments."
                 )
@@ -942,8 +916,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if self.request.user.role == "teacher":
 
             if teaching_assignment.teacher.user != self.request.user:
-                from rest_framework.exceptions import PermissionDenied
-
+    
                 raise PermissionDenied(
                     "You can only manage assignments for your own teaching assignments."
                 )
@@ -973,8 +946,6 @@ class AssignmentQuestionViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         assignment = serializer.validated_data["assignment"]
 
         if self.request.user.role == "admin":
@@ -999,8 +970,6 @@ class AssignmentQuestionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1070,8 +1039,6 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
 
-        from rest_framework.exceptions import PermissionDenied
-
         assignment = serializer.validated_data["assignment"]
 
         if self.request.user.role == "admin":
@@ -1114,8 +1081,6 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-
-        from rest_framework.exceptions import PermissionDenied
 
         instance = serializer.instance
 
@@ -1180,8 +1145,6 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         submission = serializer.validated_data["submission"]
         question = serializer.validated_data["question"]
 
@@ -1234,8 +1197,6 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1322,8 +1283,6 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         teaching_assignment = serializer.validated_data[
             "teaching_assignment"
         ]
@@ -1351,8 +1310,6 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1413,8 +1370,6 @@ class AssessmentItemViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         assessment = serializer.validated_data["assessment"]
 
         if self.request.user.role == "admin":
@@ -1440,8 +1395,6 @@ class AssessmentItemViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1506,8 +1459,6 @@ class GradeViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         assessment = serializer.validated_data["assessment"]
         student = serializer.validated_data["student"]
 
@@ -1565,8 +1516,6 @@ class GradeViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         # ====================================================
@@ -1663,8 +1612,6 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         teaching_assignment = serializer.validated_data[
             "teaching_assignment"
         ]
@@ -1692,8 +1639,6 @@ class GradeComponentViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1754,8 +1699,6 @@ class ReportCardViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can create report cards."
@@ -1764,8 +1707,6 @@ class ReportCardViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can update report cards."
@@ -1774,8 +1715,6 @@ class ReportCardViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can delete report cards."
@@ -1809,8 +1748,6 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         teaching_assignment = serializer.validated_data[
             "teaching_assignment"
         ]
@@ -1838,8 +1775,6 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -1878,8 +1813,6 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -1921,8 +1854,6 @@ class SchoolAttendanceSessionViewSet(
     ]
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role in {"admin", "teacher"}:
             serializer.save()
             return
@@ -1933,8 +1864,6 @@ class SchoolAttendanceSessionViewSet(
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role in {"admin", "teacher"}:
             serializer.save()
             return
@@ -1945,8 +1874,6 @@ class SchoolAttendanceSessionViewSet(
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role in {"admin", "teacher"}:
             instance.delete()
             return
@@ -1985,8 +1912,6 @@ class SchoolAttendanceRecordViewSet(
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         session = serializer.validated_data["session"]
         student = serializer.validated_data["student"]
 
@@ -2030,8 +1955,6 @@ class SchoolAttendanceRecordViewSet(
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         # ADMIN
@@ -2074,8 +1997,6 @@ class SchoolAttendanceRecordViewSet(
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role in {
             "admin",
             "teacher",
@@ -2115,8 +2036,6 @@ class ClassAttendanceSessionViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         schedule = serializer.validated_data["schedule"]
 
         if self.request.user.role == "admin":
@@ -2143,8 +2062,6 @@ class ClassAttendanceSessionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -2184,8 +2101,6 @@ class ClassAttendanceSessionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -2241,8 +2156,6 @@ class ClassAttendanceRecordViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         session = serializer.validated_data["session"]
         student = serializer.validated_data["student"]
 
@@ -2304,8 +2217,6 @@ class ClassAttendanceRecordViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         # ====================================================
@@ -2386,8 +2297,6 @@ class ClassAttendanceRecordViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -2447,8 +2356,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             serializer.save(
                 created_by=self.request.user
@@ -2467,8 +2374,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -2490,8 +2395,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -2538,8 +2441,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can create notifications."
@@ -2548,8 +2449,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Users cannot directly update notifications."
@@ -2558,7 +2457,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
+        
 
         if self.request.user.role != "admin":
             raise PermissionDenied(
@@ -2636,8 +2535,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -2653,8 +2550,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -2691,8 +2586,6 @@ class ConversationMemberViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         conversation = serializer.validated_data["conversation"]
 
         if self.request.user.role == "admin":
@@ -2707,8 +2600,6 @@ class ConversationMemberViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -2723,8 +2614,6 @@ class ConversationMemberViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role == "admin":
             instance.delete()
             return
@@ -2758,8 +2647,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         conversation = serializer.validated_data["conversation"]
 
         if self.request.user.role == "admin":
@@ -2783,8 +2670,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Messages cannot be modified."
@@ -2793,8 +2678,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Messages cannot be deleted."
@@ -2815,8 +2698,6 @@ class SettingViewSet(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can create settings."
@@ -2825,8 +2706,6 @@ class SettingViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can update settings."
@@ -2835,8 +2714,6 @@ class SettingViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
-
         if self.request.user.role != "admin":
             raise PermissionDenied(
                 "Only administrators can delete settings."

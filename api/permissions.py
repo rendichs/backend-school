@@ -275,21 +275,6 @@ class IsMaterialFileOwnerOrAdmin(BasePermission):
 
         return False
 
-    def has_object_permission(self, request, view, obj):
-        if request.user.role == "admin":
-            return True
-
-        if request.user.role == "teacher":
-            return (
-                obj.material.teaching_assignment.teacher.user
-                == request.user
-            )
-
-        if request.user.role == "student":
-            return request.method in self.SAFE_METHODS
-
-        return False
-
 
 class IsFileOwnerOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -314,15 +299,6 @@ class IsFileOwnerOrAdmin(BasePermission):
             return True
 
         return obj.uploaded_by == request.user
-
-    def has_object_permission(self, request, view, obj):
-        if request.user.role == "admin":
-            return True
-
-        if request.user.role in {"teacher", "student"}:
-            return obj.uploaded_by == request.user
-
-        return False
 
 
 class IsAssignmentOwnerOrAdmin(BasePermission):
@@ -405,17 +381,6 @@ class IsAssignmentFileOwnerOrAdmin(BasePermission):
 
 
 class IsSubmissionOwnerOrTeacherOrAdmin(BasePermission):
-    """
-    Admin:
-        - Full access
-
-    Teacher:
-        - Access submissions for their own assignments
-
-    Student:
-        - Only access their own submissions
-    """
-
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
@@ -432,14 +397,12 @@ class IsSubmissionOwnerOrTeacherOrAdmin(BasePermission):
 
         if request.user.role == "teacher":
             return (
-                obj.assignment.teaching_assignment.teacher.user
-                == request.user
+                obj.assignment.teaching_assignment.teacher.user == request.user
             )
 
         if request.user.role == "student":
             return (
-                obj.student.user
-                == request.user
+                obj.student.user == request.user
             )
 
         return False
