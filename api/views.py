@@ -149,7 +149,7 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     permission_classes = [
-        IsAuthenticated
+        IsAdminUserRole
     ]
 
 
@@ -456,18 +456,22 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         material = serializer.validated_data["material"]
+        file = serializer.validated_data["file"]
 
         if self.request.user.role == "admin":
             serializer.save()
             return
 
         if self.request.user.role == "teacher":
-            if (
-                material.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+
+            if material.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only attach files to your own materials."
+                )
+
+            if file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
                 )
 
             serializer.save()
@@ -485,10 +489,8 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-            if (
-                instance.material.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+
+            if instance.material.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only manage files of your own materials."
                 )
@@ -498,12 +500,19 @@ class MaterialFileViewSet(viewsets.ModelViewSet):
                 instance.material,
             )
 
-            if (
-                new_material.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+            new_file = serializer.validated_data.get(
+                "file",
+                instance.file,
+            )
+
+            if new_material.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only move files to your own materials."
+                )
+
+            if new_file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
                 )
 
             serializer.save()
@@ -561,18 +570,22 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         assignment = serializer.validated_data["assignment"]
+        file = serializer.validated_data["file"]
 
         if self.request.user.role == "admin":
             serializer.save()
             return
 
         if self.request.user.role == "teacher":
-            if (
-                assignment.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+
+            if assignment.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only attach files to your own assignments."
+                )
+
+            if file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
                 )
 
             serializer.save()
@@ -590,10 +603,8 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-            if (
-                instance.assignment.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+
+            if instance.assignment.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only manage files of your own assignments."
                 )
@@ -603,12 +614,19 @@ class AssignmentFileViewSet(viewsets.ModelViewSet):
                 instance.assignment,
             )
 
-            if (
-                new_assignment.teaching_assignment.teacher.user
-                != self.request.user
-            ):
+            new_file = serializer.validated_data.get(
+                "file",
+                instance.file,
+            )
+
+            if new_assignment.teaching_assignment.teacher.user != self.request.user:
                 raise PermissionDenied(
                     "You can only move files to your own assignments."
+                )
+
+            if new_file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
                 )
 
             serializer.save()
@@ -672,45 +690,40 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
+
         submission = serializer.validated_data["submission"]
+        file = serializer.validated_data["file"]
 
         if self.request.user.role == "admin":
-            serializer.save(
-                file__uploaded_by=self.request.user
-            )
-            return
-
-        if self.request.user.role == "teacher":
-            if (
-                submission.assignment
-                .teaching_assignment.teacher.user
-                != self.request.user
-            ):
-                raise PermissionDenied(
-                    "You can only manage files of submissions "
-                    "for your own assignments."
-                )
-
             serializer.save()
             return
 
         if self.request.user.role == "student":
-            if (
-                submission.student.user
-                != self.request.user
-            ):
+
+            if submission.student.user != self.request.user:
                 raise PermissionDenied(
                     "You can only upload files to your own submission."
                 )
 
+            if file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
+                )
+
             serializer.save()
             return
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot upload submission files."
+            )
 
         raise PermissionDenied(
             "You do not have permission to create a submission file."
         )
 
     def perform_update(self, serializer):
+
         instance = serializer.instance
 
         if self.request.user.role == "admin":
@@ -718,25 +731,15 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
             return
 
         if self.request.user.role == "teacher":
-            if (
-                instance.submission.assignment
-                .teaching_assignment.teacher.user
-                != self.request.user
-            ):
-                raise PermissionDenied(
-                    "You can only manage files of your own assignments."
-                )
-
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Teachers cannot modify submission files."
+            )
 
         if self.request.user.role == "student":
-            if (
-                instance.submission.student.user
-                != self.request.user
-            ):
+
+            if instance.submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only manage your own submission files."
+                    "You can only manage files of your own submission."
                 )
 
             new_submission = serializer.validated_data.get(
@@ -744,53 +747,51 @@ class SubmissionFileViewSet(viewsets.ModelViewSet):
                 instance.submission,
             )
 
-            if (
-                new_submission.student.user
-                != self.request.user
-            ):
+            new_file = serializer.validated_data.get(
+                "file",
+                instance.file,
+            )
+
+            if new_submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only move files to your own submission."
+                    "You can only attach files to your own submission."
+                )
+
+            if new_file.uploaded_by != self.request.user:
+                raise PermissionDenied(
+                    "You can only attach your own uploaded files."
                 )
 
             serializer.save()
             return
 
         raise PermissionDenied(
-            "You do not have permission to update this submission file."
+            "You do not have permission to update a submission file."
         )
 
     def perform_destroy(self, instance):
+
         if self.request.user.role == "admin":
             instance.delete()
             return
 
-        if self.request.user.role == "teacher":
-            if (
-                instance.submission.assignment
-                .teaching_assignment.teacher.user
-                != self.request.user
-            ):
-                raise PermissionDenied(
-                    "You can only delete files of your own assignments."
-                )
-
-            instance.delete()
-            return
-
         if self.request.user.role == "student":
-            if (
-                instance.submission.student.user
-                != self.request.user
-            ):
+
+            if instance.submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only delete your own submission files."
+                    "You can only delete files of your own submission."
                 )
 
             instance.delete()
             return
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot delete submission files."
+            )
 
         raise PermissionDenied(
-            "You do not have permission to delete this submission file."
+            "You do not have permission to delete a submission file."
         )
 
 
@@ -1042,8 +1043,9 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
         assignment = serializer.validated_data["assignment"]
 
         if self.request.user.role == "admin":
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Administrators cannot create assignment submissions."
+            )
 
         if self.request.user.role == "teacher":
             raise PermissionDenied(
@@ -1081,38 +1083,48 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
-
-        instance = serializer.instance
-
         if self.request.user.role == "admin":
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Administrators cannot modify assignment submissions."
+            )
 
         if self.request.user.role == "teacher":
-
-            if (
-                instance.assignment.teaching_assignment.teacher.user
-                != self.request.user
-            ):
-                raise PermissionDenied(
-                    "You can only manage submissions for your own assignments."
-                )
-
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Teachers cannot modify assignment submissions."
+            )
 
         if self.request.user.role == "student":
 
+            instance = serializer.instance
+
             if instance.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only manage your own submission."
+                    "You can only modify your own submission."
                 )
 
-            serializer.save()
+            new_student = serializer.validated_data.get(
+                "student",
+                instance.student,
+            )
+
+            if new_student.user != self.request.user:
+                raise PermissionDenied(
+                    "You cannot change the owner of a submission."
+                )
+
+            serializer.save(
+                student=instance.student
+            )
             return
 
         raise PermissionDenied(
-            "You do not have permission to update this submission."
+            "You do not have permission to update an assignment submission."
+        )
+
+    def perform_destroy(self, instance):
+
+        raise PermissionDenied(
+            "Assignment submissions cannot be deleted."
         )
 
 
@@ -1146,54 +1158,38 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         submission = serializer.validated_data["submission"]
-        question = serializer.validated_data["question"]
-
-        # ====================================================
-        # ADMIN
-        # ====================================================
 
         if self.request.user.role == "admin":
             serializer.save()
             return
 
-        # ====================================================
-        # TEACHER
-        # ====================================================
-
         if self.request.user.role == "teacher":
 
             if (
-                submission.assignment.teaching_assignment.teacher.user
+                submission.assignment
+                .teaching_assignment.teacher.user
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage answers for your own assignments."
+                    "You can only manage answers from your own assignments."
                 )
 
-            serializer.save()
-            return
-
-        # ====================================================
-        # STUDENT
-        # ====================================================
+            raise PermissionDenied(
+                "Teachers cannot create submission answers."
+            )
 
         if self.request.user.role == "student":
 
             if submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only answer your own submission."
-                )
-
-            if question.assignment_id != submission.assignment_id:
-                raise PermissionDenied(
-                    "This question does not belong to the submission assignment."
+                    "You can only create answers for your own submission."
                 )
 
             serializer.save()
             return
 
         raise PermissionDenied(
-            "You do not have permission to create an answer."
+            "You do not have permission to create a submission answer."
         )
 
     def perform_update(self, serializer):
@@ -1211,50 +1207,59 @@ class SubmissionAnswerViewSet(viewsets.ModelViewSet):
                 != self.request.user
             ):
                 raise PermissionDenied(
-                    "You can only manage answers for your own assignments."
+                    "You can only manage answers from your own assignments."
                 )
 
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Teachers cannot modify submission answers."
+            )
 
         if self.request.user.role == "student":
 
-            if (
-                instance.submission.student.user
-                != self.request.user
-            ):
+            if instance.submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only manage your own answers."
+                    "You can only modify your own submission answers."
                 )
 
             new_submission = serializer.validated_data.get(
                 "submission",
-                instance.submission
-            )
-
-            new_question = serializer.validated_data.get(
-                "question",
-                instance.question
+                instance.submission,
             )
 
             if new_submission.student.user != self.request.user:
                 raise PermissionDenied(
-                    "You can only manage your own answers."
-                )
-
-            if (
-                new_question.assignment_id
-                != new_submission.assignment_id
-            ):
-                raise PermissionDenied(
-                    "The question must belong to the submission assignment."
+                    "You can only move answers to your own submission."
                 )
 
             serializer.save()
             return
 
         raise PermissionDenied(
-            "You do not have permission to update this answer."
+            "You do not have permission to update a submission answer."
+        )
+
+    def perform_destroy(self, instance):
+        if self.request.user.role == "admin":
+            instance.delete()
+            return
+
+        if self.request.user.role == "student":
+
+            if instance.submission.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only delete your own submission answers."
+                )
+
+            instance.delete()
+            return
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot delete submission answers."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to delete a submission answer."
         )
 
 
