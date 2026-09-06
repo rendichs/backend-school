@@ -1916,34 +1916,28 @@ class SchoolAttendanceSessionViewSet(
     ]
 
     def perform_create(self, serializer):
-        if self.request.user.role in {"admin", "teacher"}:
-            serializer.save()
-            return
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can update school attendance sessions."
+            )
 
-        raise PermissionDenied(
-            "You do not have permission to create "
-            "a school attendance session."
-        )
+        serializer.save()
 
     def perform_update(self, serializer):
-        if self.request.user.role in {"admin", "teacher"}:
-            serializer.save()
-            return
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can update school attendance sessions."
+            )
 
-        raise PermissionDenied(
-            "You do not have permission to update "
-            "a school attendance session."
-        )
+        serializer.save()
 
     def perform_destroy(self, instance):
-        if self.request.user.role in {"admin", "teacher"}:
-            instance.delete()
-            return
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can delete school attendance sessions."
+            )
 
-        raise PermissionDenied(
-            "You do not have permission to delete "
-            "a school attendance session."
-        )
+        instance.delete()
 
 
 class SchoolAttendanceRecordViewSet(
@@ -1974,102 +1968,28 @@ class SchoolAttendanceRecordViewSet(
         return queryset
 
     def perform_create(self, serializer):
-        session = serializer.validated_data["session"]
-        student = serializer.validated_data["student"]
-
-        # ADMIN
-        if self.request.user.role == "admin":
-            serializer.save()
-            return
-
-        # TEACHER
-        if self.request.user.role == "teacher":
-
-            teacher_profile = getattr(
-                self.request.user,
-                "teacher_profile",
-                None,
-            )
-
-            if teacher_profile is None:
-                raise PermissionDenied(
-                    "Teacher profile not found."
-                )
-
-            if student.school_id != session.school_id:
-                raise PermissionDenied(
-                    "Student does not belong to "
-                    "the attendance school."
-                )
-
-            serializer.save()
-            return
-
-        # STUDENT
-        if self.request.user.role == "student":
+        if self.request.user.role != "admin":
             raise PermissionDenied(
-                "Students cannot create school attendance records."
+                "Only admin can create school attendance records."
             )
 
-        raise PermissionDenied(
-            "You do not have permission to create "
-            "a school attendance record."
-        )
+        serializer.save()
 
     def perform_update(self, serializer):
-        instance = serializer.instance
-
-        # ADMIN
-        if self.request.user.role == "admin":
-            serializer.save()
-            return
-
-        # TEACHER
-        if self.request.user.role == "teacher":
-
-            session = serializer.validated_data.get(
-                "session",
-                instance.session,
-            )
-
-            student = serializer.validated_data.get(
-                "student",
-                instance.student,
-            )
-
-            if student.school_id != session.school_id:
-                raise PermissionDenied(
-                    "Student does not belong to "
-                    "the attendance school."
-                )
-
-            serializer.save()
-            return
-
-        # STUDENT
-        if self.request.user.role == "student":
+        if self.request.user.role != "admin":
             raise PermissionDenied(
-                "Students cannot modify "
-                "school attendance records."
+                "Only admin can update school attendance records."
             )
 
-        raise PermissionDenied(
-            "You do not have permission to update "
-            "this attendance record."
-        )
+        serializer.save()
 
     def perform_destroy(self, instance):
-        if self.request.user.role in {
-            "admin",
-            "teacher",
-        }:
-            instance.delete()
-            return
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can delete school attendance records."
+            )
 
-        raise PermissionDenied(
-            "You do not have permission to delete "
-            "this attendance record."
-        )
+        instance.delete()
 
 
 # ============================================================

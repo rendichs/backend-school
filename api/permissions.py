@@ -734,27 +734,24 @@ class IsClassAttendanceSessionOwnerOrAdmin(BasePermission):
 
         return False
 
-class IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin(
-    BasePermission
-):
+class IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        return request.user.role in {
-            "admin",
-            "teacher",
-            "student",
-        }
+        if request.user.role in {"admin", "teacher", "student"}:
+            return True
+
+        return False
 
     def has_object_permission(self, request, view, obj):
         if request.user.role == "admin":
             return True
 
         if request.user.role == "teacher":
-            return True
+            return request.method in self.SAFE_METHODS
 
         if request.user.role == "student":
             return (
@@ -771,19 +768,19 @@ class IsSchoolAttendanceSessionOwnerOrAdmin(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if request.user.role in {"admin", "teacher"}:
+        if request.user.role == "admin":
             return True
 
-        if request.user.role == "student":
+        if request.user.role in {"teacher", "student"}:
             return request.method in self.SAFE_METHODS
 
         return False
 
     def has_object_permission(self, request, view, obj):
-        if request.user.role in {"admin", "teacher"}:
+        if request.user.role == "admin":
             return True
 
-        if request.user.role == "student":
+        if request.user.role in {"teacher", "student"}:
             return request.method in self.SAFE_METHODS
 
         return False
@@ -830,10 +827,10 @@ class IsNotificationOwnerOrAdmin(BasePermission):
         if request.user.role == "admin":
             return True
 
-        if request.user.role in {
-            "teacher",
-            "student",
-        }:
+        if request.user.role in {"teacher", "student"}:
+            if getattr(view, "action", None) == "mark_read":
+                return True
+
             return request.method in self.SAFE_METHODS
 
         return False
@@ -842,12 +839,13 @@ class IsNotificationOwnerOrAdmin(BasePermission):
         if request.user.role == "admin":
             return True
 
-        if request.user.role in {
-            "teacher",
-            "student",
-        }:
+        if request.user.role in {"teacher", "student"}:
+            if getattr(view, "action", None) == "mark_read":
+                return obj.user == request.user
+
             return (
-                obj.user == request.user
+                request.method in self.SAFE_METHODS
+                and obj.user == request.user
             )
 
         return False
