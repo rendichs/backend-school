@@ -1084,54 +1084,54 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
 
-    if self.request.user.role == "admin":
+        if self.request.user.role == "admin":
+            raise PermissionDenied(
+                "Administrators cannot modify assignment submissions."
+            )
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot modify assignment submissions."
+            )
+
+        if self.request.user.role == "student":
+
+            instance = serializer.instance
+
+            if instance.student.user != self.request.user:
+                raise PermissionDenied(
+                    "You can only modify your own submission."
+                )
+
+            new_student = serializer.validated_data.get(
+                "student",
+                instance.student,
+            )
+
+            if new_student.user != self.request.user:
+                raise PermissionDenied(
+                    "You cannot change the owner of a submission."
+                )
+
+            new_assignment = serializer.validated_data.get(
+                "assignment",
+                instance.assignment,
+            )
+
+            if new_assignment != instance.assignment:
+                raise PermissionDenied(
+                    "You cannot change the assignment of a submission."
+                )
+
+            serializer.save(
+                student=instance.student,
+                assignment=instance.assignment,
+            )
+            return
+
         raise PermissionDenied(
-            "Administrators cannot modify assignment submissions."
+            "You do not have permission to update an assignment submission."
         )
-
-    if self.request.user.role == "teacher":
-        raise PermissionDenied(
-            "Teachers cannot modify assignment submissions."
-        )
-
-    if self.request.user.role == "student":
-
-        instance = serializer.instance
-
-        if instance.student.user != self.request.user:
-            raise PermissionDenied(
-                "You can only modify your own submission."
-            )
-
-        new_student = serializer.validated_data.get(
-            "student",
-            instance.student,
-        )
-
-        if new_student.user != self.request.user:
-            raise PermissionDenied(
-                "You cannot change the owner of a submission."
-            )
-
-        new_assignment = serializer.validated_data.get(
-            "assignment",
-            instance.assignment,
-        )
-
-        if new_assignment != instance.assignment:
-            raise PermissionDenied(
-                "You cannot change the assignment of a submission."
-            )
-
-        serializer.save(
-            student=instance.student,
-            assignment=instance.assignment,
-        )
-        return
-
-    raise PermissionDenied(
-        "You do not have permission to update an assignment submission."
-    )
 
     def perform_destroy(self, instance):
 
@@ -1506,8 +1506,9 @@ class GradeViewSet(viewsets.ModelViewSet):
         # ====================================================
 
         if self.request.user.role == "admin":
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Administrators cannot create grades."
+            )
 
         # ====================================================
         # TEACHER
@@ -1562,8 +1563,9 @@ class GradeViewSet(viewsets.ModelViewSet):
         # ====================================================
 
         if self.request.user.role == "admin":
-            serializer.save()
-            return
+            raise PermissionDenied(
+                "Administrators cannot update grades."
+            )
 
         # ====================================================
         # TEACHER
@@ -1627,6 +1629,27 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         raise PermissionDenied(
             "You do not have permission to update this grade."
+        )
+
+    def perform_destroy(self, instance):
+
+        if self.request.user.role == "admin":
+            raise PermissionDenied(
+                "Administrators cannot delete grades."
+            )
+
+        if self.request.user.role == "teacher":
+            raise PermissionDenied(
+                "Teachers cannot delete grades."
+            )
+
+        if self.request.user.role == "student":
+            raise PermissionDenied(
+                "Students cannot delete grades."
+            )
+
+        raise PermissionDenied(
+            "You do not have permission to delete this grade."
         )
 
 
@@ -2639,18 +2662,9 @@ class ConversationMemberViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        instance = serializer.instance
-
-        if self.request.user.role == "admin":
-            serializer.save()
-            return
-
-        if instance.conversation.created_by != self.request.user:
-            raise PermissionDenied(
-                "Only the conversation creator can update members."
-            )
-
-        serializer.save()
+        raise PermissionDenied(
+            "Conversation members cannot be modified."
+        )
 
     def perform_destroy(self, instance):
         if self.request.user.role == "admin":
