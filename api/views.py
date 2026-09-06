@@ -2320,12 +2320,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        if self.request.user.role == "teacher":
-            queryset = queryset.filter(
-                created_by=self.request.user
-            )
-
-        elif self.request.user.role == "student":
+        if self.request.user.role == "student":
             queryset = queryset.filter(
                 target__in=[
                     "public",
@@ -2338,62 +2333,30 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        if self.request.user.role == "admin":
-            serializer.save(
-                created_by=self.request.user
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can create announcements."
             )
-            return
 
-        if self.request.user.role == "teacher":
-            serializer.save(
-                created_by=self.request.user
-            )
-            return
-
-        raise PermissionDenied(
-            "You do not have permission to create "
-            "an announcement."
+        serializer.save(
+            created_by=self.request.user
         )
 
     def perform_update(self, serializer):
-        instance = serializer.instance
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can update announcements."
+            )
 
-        if self.request.user.role == "admin":
-            serializer.save()
-            return
-
-        if self.request.user.role == "teacher":
-            if instance.created_by != self.request.user:
-                raise PermissionDenied(
-                    "You can only manage your own announcements."
-                )
-
-            serializer.save()
-            return
-
-        raise PermissionDenied(
-            "You do not have permission to update "
-            "this announcement."
-        )
+        serializer.save()
 
     def perform_destroy(self, instance):
-        if self.request.user.role == "admin":
-            instance.delete()
-            return
+        if self.request.user.role != "admin":
+            raise PermissionDenied(
+                "Only admin can delete announcements."
+            )
 
-        if self.request.user.role == "teacher":
-            if instance.created_by != self.request.user:
-                raise PermissionDenied(
-                    "You can only delete your own announcements."
-                )
-
-            instance.delete()
-            return
-
-        raise PermissionDenied(
-            "You do not have permission to delete "
-            "this announcement."
-        )
+        instance.delete()
 
 
 # ============================================================

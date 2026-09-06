@@ -795,10 +795,7 @@ class IsAnnouncementOwnerOrAdmin(BasePermission):
         if request.user.role == "admin":
             return True
 
-        if request.user.role == "teacher":
-            return True
-
-        if request.user.role == "student":
+        if request.user.role in {"teacher", "student"}:
             return request.method in self.SAFE_METHODS
 
         return False
@@ -807,16 +804,11 @@ class IsAnnouncementOwnerOrAdmin(BasePermission):
         if request.user.role == "admin":
             return True
 
-        if request.user.role == "teacher":
-            return (
-                obj.created_by == request.user
-            )
-
-        if request.user.role == "student":
+        if request.user.role in {"teacher", "student"}:
             return request.method in self.SAFE_METHODS
 
         return False
-
+        
 class IsNotificationOwnerOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
