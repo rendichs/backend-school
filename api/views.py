@@ -35,7 +35,6 @@ from .permissions import (
     IsScheduleOwnerOrAdmin,
     IsClassAttendanceSessionOwnerOrAdmin,
     IsClassAttendanceRecordOwnerOrTeacherOrAdmin,
-    IsSchoolAttendanceSessionAdminOrTeacher,
     IsSchoolAttendanceSessionOwnerOrAdmin,
     IsSchoolAttendanceRecordOwnerOrTeacherOrAdmin,
     IsNotificationOwnerOrAdmin,

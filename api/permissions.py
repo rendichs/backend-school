@@ -701,6 +701,43 @@ class IsScheduleOwnerOrAdmin(BasePermission):
 
         return False
 
+class IsClassAttendanceRecordOwnerOrTeacherOrAdmin(BasePermission):
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return True
+
+        if request.user.role == "student":
+            return request.method in self.SAFE_METHODS
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == "admin":
+            return True
+
+        if request.user.role == "teacher":
+            return (
+                obj.session.schedule
+                .teaching_assignment.teacher.user
+                == request.user
+            )
+
+        if request.user.role == "student":
+            return (
+                request.method in self.SAFE_METHODS
+                and obj.student.user == request.user
+            )
+
+        return False
+
 class IsClassAttendanceSessionOwnerOrAdmin(BasePermission):
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
