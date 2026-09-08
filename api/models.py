@@ -126,12 +126,6 @@ class TeacherProfile(models.Model):
         limit_choices_to={"role": "teacher"},
     )
 
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="teachers",
-    )
-
     employee_number = models.CharField(
         max_length=50,
         unique=True,
@@ -180,12 +174,6 @@ class StudentProfile(models.Model):
         limit_choices_to={"role": "student"},
     )
 
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="students",
-    )
-
     student_number = models.CharField(
         max_length=50,
         unique=True,
@@ -224,12 +212,6 @@ class StudentProfile(models.Model):
 # ============================================================
 
 class AcademicYear(models.Model):
-
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="academic_years",
-    )
 
     name = models.CharField(
         max_length=20,
@@ -307,12 +289,6 @@ class Semester(models.Model):
 
 class Program(models.Model):
 
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="programs",
-    )
-
     name = models.CharField(
         max_length=100,
     )
@@ -350,12 +326,6 @@ class Program(models.Model):
 # ============================================================
 
 class InterestClass(models.Model):
-
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="interest_classes",
-    )
 
     name = models.CharField(
         max_length=100,
@@ -520,12 +490,6 @@ class ClassMember(models.Model):
 
 class SubjectGroup(models.Model):
 
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="subject_groups",
-    )
-
     name = models.CharField(
         max_length=100,
     )
@@ -558,12 +522,6 @@ class SubjectGroup(models.Model):
 
 
 class Subject(models.Model):
-
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="subjects",
-    )
 
     subject_group = models.ForeignKey(
         SubjectGroup,
@@ -1346,12 +1304,6 @@ class Schedule(models.Model):
 class SchoolAttendanceSession(models.Model):
 
     date = models.DateField()
-
-    school = models.ForeignKey(
-        School,
-        on_delete=models.PROTECT,
-        related_name="school_attendance_sessions",
-    )
 
     start_time = models.TimeField(
         blank=True,
