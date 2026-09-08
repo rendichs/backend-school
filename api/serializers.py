@@ -115,11 +115,6 @@ class TeacherSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
-    school = serializers.PrimaryKeyRelatedField(
-        source="teacher_profile.school",
-        queryset=School.objects.all(),
-    )
-
     password = serializers.CharField(
         write_only=True,
         required=False,
@@ -140,7 +135,6 @@ class TeacherSerializer(serializers.ModelSerializer):
             "gender",
             "phone",
             "address",
-            "school",
             "is_active",
         ]
 
@@ -237,11 +231,6 @@ class StudentSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
-    school = serializers.PrimaryKeyRelatedField(
-        source="student_profile.school",
-        queryset=School.objects.all(),
-    )
-
     password = serializers.CharField(
         write_only=True,
         required=False,
@@ -262,7 +251,6 @@ class StudentSerializer(serializers.ModelSerializer):
             "gender",
             "date_of_birth",
             "address",
-            "school",
             "is_active",
         ]
 
@@ -550,43 +538,7 @@ class TeachingAssignmentSerializer(serializers.ModelSerializer):
         errors = {}
 
         # ====================================================
-        # 1. TEACHER ↔ SCHOOL CLASS
-        # ====================================================
-
-        if teacher and school_class:
-
-            teacher_school_id = teacher.school_id
-
-            class_school_id = (
-                school_class.program.school_id
-            )
-
-            if teacher_school_id != class_school_id:
-                errors["teacher"] = (
-                    "Teacher and class must belong "
-                    "to the same school."
-                )
-
-        # ====================================================
-        # 2. SUBJECT ↔ SCHOOL CLASS
-        # ====================================================
-
-        if subject and school_class:
-
-            subject_school_id = subject.school_id
-
-            class_school_id = (
-                school_class.program.school_id
-            )
-
-            if subject_school_id != class_school_id:
-                errors["subject"] = (
-                    "Subject and class must belong "
-                    "to the same school."
-                )
-
-        # ====================================================
-        # 3. CLASS ↔ ACADEMIC YEAR
+        # 1. CLASS ↔ ACADEMIC YEAR
         # ====================================================
 
         if school_class and academic_year:
@@ -598,7 +550,7 @@ class TeachingAssignmentSerializer(serializers.ModelSerializer):
                 )
 
         # ====================================================
-        # 4. SEMESTER ↔ ACADEMIC YEAR
+        # 2. SEMESTER ↔ ACADEMIC YEAR
         # ====================================================
 
         if semester and academic_year:
