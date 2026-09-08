@@ -231,8 +231,8 @@ class AcademicYear(models.Model):
         ordering = ["-start_date"]
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "name"],
-                name="unique_academic_year_per_school",
+                fields=["name"],
+                name="unique_academic_year",
             )
         ]
 
@@ -312,8 +312,8 @@ class Program(models.Model):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "code"],
-                name="unique_program_code_per_school",
+                fields=["code"],
+                name="unique_program_code",
             )
         ]
 
@@ -350,8 +350,8 @@ class InterestClass(models.Model):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "code"],
-                name="unique_interest_class_code_per_school",
+                fields=["code"],
+                name="unique_interest_class_code",
             )
         ]
 
@@ -512,8 +512,8 @@ class SubjectGroup(models.Model):
         db_table = "subject_groups"
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "code"],
-                name="unique_subject_group_code_per_school",
+                fields=["code"],
+                name="unique_subject_group_code",
             )
         ]
 
@@ -560,8 +560,8 @@ class Subject(models.Model):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "code"],
-                name="unique_subject_code_per_school",
+                fields=["code"],
+                name="unique_subject_code",
             )
         ]
 
@@ -1326,8 +1326,8 @@ class SchoolAttendanceSession(models.Model):
         db_table = "school_attendance_sessions"
         constraints = [
             models.UniqueConstraint(
-                fields=["school", "date"],
-                name="unique_school_attendance_per_day",
+                fields=["date"],
+                name="unique_school_attendance",
             )
         ]
 
